@@ -90,11 +90,9 @@ static int int_digit_places (int n) {
         } \
     } while (0)
 
-//#define wassert ASSERT
-
 #define static_assert _Static_assert
 
-//#define STATIC_ASSERT(x) static_assert(x, #x)
+#define wstatic_assert(x) static_assert(x, #x)
 
 #define printfd(fmt, ...) \
     do { \

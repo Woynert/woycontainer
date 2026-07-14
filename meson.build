@@ -2,7 +2,7 @@
 # Library.
 
 project('woycontainer', 'c', default_options : ['c_std=gnu11'])
-woycontainer_includes = include_directories('./')
+woycontainer_includes = include_directories('./src')
 woycontainer_dep = declare_dependency(
   include_directories: woycontainer_includes
 )
