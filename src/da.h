@@ -1,22 +1,34 @@
 #include <limits.h>
+#include <stdalign.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 
 /*
- * Type safe dynamic array.
- *
- * Note: This container uses signed int for size and capacity variables. The
- *     maximum size allowed is INT_MAX from "limits.h". Usually that's
- *     2_147_483_647 items (0x7fffffff). For more info read:
- *     https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1428r0.pdf
- *
- * Usage:
- *
- * #define DYNA__TYPE <type>
- * #define DYNA__NAMESPACE <custom name> (optional)
- * #define DYNA__ENABLE_COMPARISONS      (optional)
- * #include "dyna.h"
+    Type safe dynamic array.
+
+    Note: This container uses signed int for size and capacity variables. The
+       maximum size allowed is INT_MAX from "limits.h". Usually that's
+       2_147_483_647 items (0x7fffffff). For more info read:
+       https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1428r0.pdf
+
+    Usage:
+
+        #define DYNA__TYPE <type>
+        #define DYNA__NAMESPACE <custom name> (optional)
+        #define DYNA__ENABLE_COMPARISONS      (optional)
+        #include "dyna.h"
+
+    To use a custom allocator use the create_with_allocator function. It receives
+    a function like:
+
+        void* (*allocator) (void* user_data, void* ptr, size_t size, int align);
+
+    New allocation: ptr == NULL && size > 0
+    Reallocation:   ptr != NULL && size > 0
+    Free:           ptr != NULL && size == 0
+    Returned pointer MUST be aligned to align.
 */
 
 /* User didn't specify type, using default. */
@@ -39,10 +51,15 @@
 #define TYPE DYNA__TYPE
 #define Dyna DYNA__NAMESPACE
 
+#define DYNA__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, size_t size, int align)
+
 typedef struct {
     int capacity;
     int size;
     TYPE *items;
+
+    DYNA__ALLOC_PROTOTYPE(*allocator);
+    void *allocator_user_data;
 } Dyna;
 
 typedef struct {
@@ -52,6 +69,7 @@ typedef struct {
 } pfx(Iterator);
 
 static Dyna  pfx(create)                      (void);
+static Dyna  pfx(create_with_allocator)       (DYNA__ALLOC_PROTOTYPE(*allocator), void *user_data);
 static void  pfx(free)                        (Dyna *da);
 static int   pfx(resize)                      (Dyna *da, int new_capacity);
 static void  pfx(clear_freeing)               (Dyna *da);
@@ -64,7 +82,7 @@ static void  pfx(fill_with_value)             (Dyna *da, TYPE item);
 static int   pfx(shrink)                      (Dyna *da);
 static int   pfx(insert_at_preserve_order)    (Dyna *da, int index, TYPE item);
 static int   pfx(remove_at)                   (Dyna *da, int index);
-static int   pfx(pop_at_preserve_order)       (Dyna *da, int index);
+static int   pfx(pop_at_preserve_order)       (Dyna *da, int index, TYPE *out);
 static int   pfx(set)                         (Dyna *da, int index, TYPE item);
 static TYPE *pfx(get_safe)                    (const Dyna *da, int index);
 static bool  pfx(get_next)                    (const Dyna *da, pfx(Iterator) *it);
@@ -79,6 +97,7 @@ static pfx(_Pair) pfx(_partition)             (TYPE *buffer, int from, int to);
 #endif
 static bool  pfx(_add_will_overflow_int)      (int a, int b);
 static int   pfx(_round_up_capacity)          (int capacity);
+static DYNA__ALLOC_PROTOTYPE(pfx(_default_allocator));
 
 
 static inline Dyna pfx(create) (void) {
@@ -86,9 +105,16 @@ static inline Dyna pfx(create) (void) {
 }
 
 
+static inline Dyna pfx(create_with_allocator) (DYNA__ALLOC_PROTOTYPE(*allocator), void *user_data) {
+    return (Dyna) { .allocator = allocator, .allocator_user_data = user_data };
+}
+
+
 static inline void pfx(free) (Dyna *da) {
     if (da->items != NULL) {
-        free(da->items);
+        // free.
+        DYNA__ALLOC_PROTOTYPE(*allocator) = da->allocator ? da->allocator : pfx(_default_allocator);
+        allocator(da->allocator_user_data, da->items, 0, alignof(TYPE));
     }
     *da = (Dyna) { 0 };
 }
@@ -99,16 +125,18 @@ static int pfx(resize) (Dyna *da, int new_capacity) {
     if (new_capacity < 0) { return -1; }
     if (da->capacity == new_capacity) { return 0; }
 
+    DYNA__ALLOC_PROTOTYPE(*allocator) = da->allocator != NULL ? da->allocator : pfx(_default_allocator);
     TYPE *new_ptr = NULL;
+    size_t bytes = sizeof(TYPE) * (size_t)new_capacity;
 
-    if (da->items == NULL) {
-        *da = (Dyna) { 0 };
-        new_ptr = (TYPE *)malloc(sizeof(TYPE) * (size_t)new_capacity);
-        if (new_ptr == NULL) { return -1; }
-    } else {
-        new_ptr = (TYPE *)realloc(da->items, sizeof(TYPE) * (size_t)new_capacity);
-        if (new_ptr == NULL) { return -1; }
-    }
+    /*
+        Allocator call below can be explained like this:
+        if (da->items == NULL) { malloc(size); }
+        else { realloc(da->items, size); }
+    */
+
+    new_ptr = (TYPE *)allocator(da->allocator_user_data, da->items, bytes, alignof(TYPE));
+    if (new_ptr == NULL) { return -1; }
 
     da->capacity = new_capacity;
     da->items = new_ptr;
@@ -233,11 +261,14 @@ static int pfx(insert_at_preserve_order) (Dyna *da, int index, TYPE item) {
 
 
 /// @returns error
-static int pfx(pop_at_preserve_order) (Dyna *da, int index) {
+static int pfx(pop_at_preserve_order) (Dyna *da, int index, TYPE *out) {
     if (index < 0 || index > da->size) {
         return -1;
     }
-    memmove(da->items +index, da->items +index +1, sizeof(TYPE) * (size_t)(da->size -index));
+    if (out != NULL) {
+        *out = da->items[index];
+    }
+    memmove(da->items +index, da->items +index +1, sizeof(TYPE) * (size_t)(da->size -1 -index));
     --da->size;
     return 0;
 }
@@ -377,6 +408,28 @@ static int pfx(_round_up_capacity) (int capacity) {
 }
 
 
+static DYNA__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
+    (void)align; (void)user_data; // Unused: malloc guarantees alignment.
+
+    // New allocation: ptr == NULL && size > 0
+    // Reallocation:   ptr != NULL && size > 0
+    // Free:           ptr != NULL && size == 0
+
+    void* result = NULL;
+    if (size == 0) {
+        free(ptr);
+    } else {
+        if (ptr == NULL) {
+            result = malloc(size);
+        } else {
+            result = realloc(ptr, size);
+        }
+    }
+    return result;
+}
+
+
+
 #undef DYNA__TOKCAT_
 #undef DYNA__TOKCAT
 #undef pfx
@@ -385,6 +438,7 @@ static int pfx(_round_up_capacity) (int capacity) {
 #undef DYNA__TYPE
 #undef DYNA__NAMESPACE
 #undef DYNA__ENABLE_COMPARISONS
+#undef DYNA__ALLOC_PROTOTYPE
 
 #ifndef DYNA__MACROS
 #define DYNA__MACROS
