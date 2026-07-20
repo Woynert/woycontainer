@@ -35,3 +35,9 @@ add_project_link_arguments(link_flags, language: 'c')
 
 arena_test = executable('arena_test' ,'./src/arena_test.c')
 test('arena_test', arena_test)
+
+slot_test = executable('slot_test' ,'./src/slot_test.c')
+test('slot_test', slot_test)
+
+stringpool_general_test = executable('stringpool_general_test' ,'./src/stringpool_general_test.c')
+test('stringpool_general_test', stringpool_general_test)

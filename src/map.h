@@ -53,7 +53,7 @@
 
 
 typedef struct MAP__PREFIX(Pair) {
-    int value_id; /* -1 Means available. */
+    int value_id; /* -1 Means available or empty. */
     MAP__KEY key;
 } MAP__PREFIX(Pair);
 

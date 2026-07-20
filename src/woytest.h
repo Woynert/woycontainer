@@ -103,6 +103,7 @@ bool woytest__bool_eq(bool a, bool b) { return a == b; }
 #define WOYTEST__MAKE_NUMBER_FUNCTIONS(TYPE, format)                       \
 void woytest__##TYPE##_print(TYPE v)       { printf(format, v); }          \
 bool woytest__##TYPE##_eq(TYPE a, TYPE b)  { return a == b;     }          \
+bool woytest__##TYPE##_neq(TYPE a, TYPE b) { return a != b;     }          \
 bool woytest__##TYPE##_gt(TYPE a, TYPE b)  { return a > b;      }          \
 bool woytest__##TYPE##_gte(TYPE a, TYPE b) { return a >= b;     }          \
 bool woytest__##TYPE##_lt(TYPE a, TYPE b)  { return a < b;      }          \
@@ -113,6 +114,7 @@ bool woytest__##TYPE##_lte(TYPE a, TYPE b) { return a <= b;     }
 
 WOYTEST__MAKE_NUMBER_FUNCTIONS(int, "%d")
 #define ASSERT_INT(a, b)  WOYTEST_TEMPL(a, b, int, woytest__int_eq , "ASSERT_INT_EQ" , woytest__int_print, "==")
+#define ASSERT_INT_NEQ(a, b) WOYTEST_TEMPL(a, b, int, woytest__int_neq ,"ASSERT_INT_NEQ" , woytest__int_print, "!=")
 #define ASSERT_INT_GT(a, b)  WOYTEST_TEMPL(a, b, int, woytest__int_gt , "ASSERT_INT_GT" , woytest__int_print, ">" )
 #define ASSERT_INT_GTE(a, b) WOYTEST_TEMPL(a, b, int, woytest__int_gte, "ASSERT_INT_GTE", woytest__int_print, ">=")
 #define ASSERT_INT_LT(a, b)  WOYTEST_TEMPL(a, b, int, woytest__int_lt , "ASSERT_INT_LT" , woytest__int_print, "<" )
@@ -120,6 +122,7 @@ WOYTEST__MAKE_NUMBER_FUNCTIONS(int, "%d")
 
 WOYTEST__MAKE_NUMBER_FUNCTIONS(size_t, "%zu")
 #define ASSERT_SIZE(a, b)  WOYTEST_TEMPL(a, b, size_t, woytest__size_t_eq , "ASSERT_SIZE_EQ" , woytest__size_t_print, "==")
+#define ASSERT_SIZE_NEQ(a, b) WOYTEST_TEMPL(a, b, size_t, woytest__size_t_neq, "ASSERT_SIZE_NEQ", woytest__size_t_print, "!=")
 #define ASSERT_SIZE_GT(a, b)  WOYTEST_TEMPL(a, b, size_t, woytest__size_t_gt , "ASSERT_SIZE_GT" , woytest__size_t_print, ">" )
 #define ASSERT_SIZE_GTE(a, b) WOYTEST_TEMPL(a, b, size_t, woytest__size_t_gte, "ASSERT_SIZE_GTE", woytest__size_t_print, ">=")
 #define ASSERT_SIZE_LT(a, b)  WOYTEST_TEMPL(a, b, size_t, woytest__size_t_lt , "ASSERT_SIZE_LT" , woytest__size_t_print, "<" )
@@ -127,6 +130,7 @@ WOYTEST__MAKE_NUMBER_FUNCTIONS(size_t, "%zu")
 
 WOYTEST__MAKE_NUMBER_FUNCTIONS(float, "%f")
 #define ASSERT_FLOAT(a, b)  WOYTEST_TEMPL(a, b, float, woytest__float_eq , "ASSERT_FLOAT_EQ" , woytest__float_print, "==")
+#define ASSERT_FLOAT_NEQ(a, b) WOYTEST_TEMPL(a, b, float, woytest__float_neq, "ASSERT_FLOAT_NEQ", woytest__float_print, "!=")
 #define ASSERT_FLOAT_GT(a, b)  WOYTEST_TEMPL(a, b, float, woytest__float_gt , "ASSERT_FLOAT_GT" , woytest__float_print, ">" )
 #define ASSERT_FLOAT_GTE(a, b) WOYTEST_TEMPL(a, b, float, woytest__float_gte, "ASSERT_FLOAT_GTE", woytest__float_print, ">=")
 #define ASSERT_FLOAT_LT(a, b)  WOYTEST_TEMPL(a, b, float, woytest__float_lt , "ASSERT_FLOAT_LT" , woytest__float_print, "<" )

@@ -102,7 +102,7 @@ static int int_digit_places (int n) {
 
 
 #define printval(fmt, ...) do { printf(#__VA_ARGS__" "fmt"\n", ##__VA_ARGS__); } while(0)
-#define printvalnum(var) do { printf( #var " %d\n", var); } while(0)
+#define printvalnum(var) do { printf( #var " = %d\n", var); } while(0)
 
 #define PRIbool(arg) (arg ? "true" : "false")
 
