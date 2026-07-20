@@ -176,7 +176,6 @@ int main(void) {
     TESTS_INIT();
     RUN_TEST(test_general);
     TESTS_SHOW_RESULTS();
-    return 0;
 }
 
 

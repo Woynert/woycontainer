@@ -33,11 +33,11 @@ link_flags = ['-fsanitize=address,undefined']
 add_project_arguments(warning_flags + san_flags, language: 'c')
 add_project_link_arguments(link_flags, language: 'c')
 
-arena_test = executable('arena_test' ,'./src/arena_test.c')
+arena_test = executable('arena_test', './src/arena_test.c')
 test('arena_test', arena_test)
 
-slot_test = executable('slot_test' ,'./src/slot_test.c')
+slot_test = executable('slot_test', './src/slot_test.c')
 test('slot_test', slot_test)
 
-stringpool_general_test = executable('stringpool_general_test' ,'./src/stringpool_general_test.c')
-test('stringpool_general_test', stringpool_general_test)
+strpool_test = executable('strpool_test', './src/strpool_test.c')
+test('strpool_test', strpool_test)

@@ -1,5 +1,5 @@
 /*
-   Stringpool data structure.
+   String pool data structure.
 
    FEATURES:
    * Pro: Stable user facing ids.
@@ -8,7 +8,7 @@
    * Pro: Fast deletion.
    * Neutral: Finds space using a "free list". (Red-Black tree would be better).
    * Con: Previously deleted ids will be reutilized often.
- */
+*/
 
 #ifndef STRPOOL_GENERAL
 #define STRPOOL_GENERAL

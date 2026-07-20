@@ -1,7 +1,7 @@
 
 #include "woytest.h"
 #include "portable_utils.h"
-#include "stringpool_general.h"
+#include "strpool.h"
 
 
 #define str strpool__str
@@ -255,7 +255,6 @@ TEST test_general(void) {
     ASSERT_INT(pool.nodes[0].free_chunks, 2048);
 
     strpool_destroy(&pool);
-    exit(0);
     TEST_PASS;
 }
 

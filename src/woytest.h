@@ -78,20 +78,22 @@
 
 
 
-#define TESTS_SHOW_RESULTS()                      \
-    do {                                          \
-        printf("---\nPassed %d out of %d tests.", \
-            _woytest_passed,                      \
-            _woytest_count                        \
-        );                                        \
-        if (_woytest_passed < _woytest_count) {   \
-            printf(" %sFailed %d%s.",             \
-                WOYTEST_RED,                      \
-                _woytest_count - _woytest_passed, \
-                WOYTEST_RESET                     \
-            );                                    \
-        }                                         \
-        printf("\n");                             \
+#define TESTS_SHOW_RESULTS()                                 \
+    do {                                                     \
+        printf("---\nPassed %d out of %d tests.",            \
+            _woytest_passed,                                 \
+            _woytest_count                                   \
+        );                                                   \
+        if (_woytest_passed < _woytest_count) {              \
+            printf(" %sFailed %d%s.",                        \
+                WOYTEST_RED,                                 \
+                _woytest_count - _woytest_passed,            \
+                WOYTEST_RESET                                \
+            );                                               \
+        }                                                    \
+        printf("\n");                                        \
+        if (_woytest_count == _woytest_passed) { return 0; } \
+        else { return EXIT_FAILURE; }                        \
     } while (0)
 
 

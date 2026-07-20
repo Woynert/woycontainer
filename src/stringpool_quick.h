@@ -1,10 +1,15 @@
 /*
-   Data structure properties:
-   * Unlimited growth.
-   * Can add new string buffers.
-   * Cannot delete existing buffers.
-   * However, can clear the whole thing.
-   */
+   String pool data structure.
+
+   FEATURES:
+   * Pro: Stable user facing ids.
+   * Pro: User facing ids won't be reutilized again after a call to clear.
+   * Pro: Unlimited growth.
+   * Pro: Insertion is extremely FAST (arena-like).
+   * Con: Deletion is extremely SLOW (arena-like).
+
+   Note: Prefer strpool.h instead. It is more efficient for general purpose use.
+*/
 
 #ifndef STRINGPOOL
 #define STRINGPOOL
