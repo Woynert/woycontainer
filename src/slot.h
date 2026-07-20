@@ -4,9 +4,9 @@
     FEATURES:
     * Pro: Fast insert.
     * Pro: Fast delete.
-    * Pro: Stable ids.
+    * Pro: Stable user facing ids.
     * Pro: Growable.
-    * Pro: Valid items are contiguous.
+    * Pro: Valid items are contiguous (aka. Items are iterable).
     * Con: Order not preserved.
 */
 

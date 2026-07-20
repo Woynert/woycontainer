@@ -3,19 +3,6 @@
 #include "portable_utils.h"
 #include "stringpool_general.h"
 
-/*
-void strpool_print_debug(strpool *p) {
-    printfd("\nAlright gonna print all now.");
-    for (int i = 0; i < p->pairs.size; ++i) {
-        Stringpool__Pair pair = strpool->pairs.items[i];
-        str result = (str) { .data = strpool->buffer->cstr + pair.start, .size = pair.size };
-        ASSERT(strview_is_valid(result));
-        printfd("%d (%d) [%"PRIstr"]", i, i + strpool->id_base, PRIstrarg(result));
-    }
-    printfd("FULL BUFFER (size %d)[%"PRIstr"]", strpool->buffer->capacity, PRIstrarg(strbuf_view(&strpool->buffer)));
-    printf("\n");
-}
-*/
 
 #define str strpool__str
 #define cstr_SL(sl_arg) ((str){.data=(sl_arg), .size=sizeof(sl_arg)-1})
@@ -30,7 +17,7 @@ int strpool__get_free_node_mount(strpool *p) {
     int count = 0;
     int i_node = p->i_first_free_node;
     for (;;) {
-        FreeNode *node = strpool__get_node(p, i_node);
+        strpool__Node *node = strpool__get_node(p, i_node);
         if (node == NULL) { break; }
         ++count;
         i_node = node->i_next_node;
@@ -44,7 +31,7 @@ void strpool_print_debug(strpool *p) {
     // TODO: 1. Print chain of free nodes.
 
     
-    FreeNode *node;
+    strpool__Node *node;
     int i_node = p->i_first_free_node;
 
     printf("\n");
@@ -52,7 +39,7 @@ void strpool_print_debug(strpool *p) {
     printf(ANSI_RED"Printing free nodes\n"ANSI_RESET);
     while (i_node >= 0) {
         node = &p->nodes[i_node];
-        printf("start %5d end %5d chunks %5d next %5d\n", i_node, i_node + node->free_chunks, node->free_chunks, node->i_next_node);
+        printf("chunks %-5d start %-5d end %-5d next %-5d\n", node->free_chunks, i_node, i_node + node->free_chunks, node->i_next_node);
         i_node = node->i_next_node;
     }
 
@@ -107,6 +94,7 @@ TEST test1(void) {
     ASSERT(strview_is_valid(result));
     printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
     strpool_print_debug(&pool);
+    int str_id_numbers = view_id;
 
     view_id = strpool_append(&pool, cstr_SL("lkdafjdls;jfdaljdofvjdsofjal dkjflajd lfjladsjvfoajadasofjcvodasjfcojdaofjdaos fajodisfj aopdsuf9p8uf93q4u9cfjidjlfjadljfdsjf98aua4ajf4lkj2fcljdsoafu48u2fodjalf;j84279158jfkjdaskfjd mjf9 0sudf90ja odjf kldasfj dlsjaf 98quf qoljf ldjfqp8eq9jf eljf aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "));
     strpool_print_debug(&pool);
@@ -142,6 +130,7 @@ TEST test1(void) {
     ASSERT(strview_is_valid(result));
     printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
     strpool_print_debug(&pool);
+    int str_id_locked = view_id;
 
     /*strpool_print_debug(&pool);*/
 
@@ -194,7 +183,7 @@ TEST test1(void) {
 
     // Testing the remove.
 
-    ASSERT_INT(strpool__get_free_node_mount(&pool), 2);
+    ASSERT_INT(strpool__get_free_node_mount(&pool), 1);
 
     printf("\nRemoving id ");
     printvalnum(str_id_longtext);
@@ -202,6 +191,7 @@ TEST test1(void) {
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 2);
+    str_id_longtext = -1;
 
     printf("\nRemoving id ");
     printvalnum(str_id_hello);
@@ -209,6 +199,7 @@ TEST test1(void) {
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 3);
+    str_id_hello = -1;
 
     printf("\nRemoving id ");
     printvalnum(str_id_empty2);
@@ -216,6 +207,7 @@ TEST test1(void) {
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 3);
+    str_id_empty2 = -1;
 
     printf("\nRemoving id ");
     printvalnum(str_id_empty1);
@@ -223,6 +215,7 @@ TEST test1(void) {
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 3);
+    str_id_empty1 = -1;
 
     printf("\nRemoving id ");
     printvalnum(str_id_crazy);
@@ -230,6 +223,31 @@ TEST test1(void) {
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 3);
+    str_id_crazy = -1;
+
+    // Adding.
+
+    view_id = strpool_append(&pool, cstr_SL("Hello"));
+    ASSERT(view_id != -1);
+    result = strpool_get(&pool, view_id);
+    ASSERT(strview_is_valid(result));
+    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    strpool_print_debug(&pool);
+    str_id_hello = view_id;
+
+    // Remove all.
+    err = strpool_remove(&pool, str_id_hello);
+    ASSERT_INT(err, 0);
+    err = strpool_remove(&pool, str_id_locked);
+    ASSERT_INT(err, 0);
+    err = strpool_remove(&pool, str_id_numbers);
+    ASSERT_INT(err, 0);
+    str_id_hello = -1;
+    str_id_locked = -1;
+    str_id_numbers = -1;
+
+    printfd("Removed all.");
+    strpool_print_debug(&pool);
 
     strpool_destroy(&pool);
     exit(0);
