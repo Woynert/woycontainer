@@ -28,7 +28,7 @@ void print_slot(const Fruit_Slot *s) {
 }
 
 
-TEST test1(void) {
+TEST test_general(void) {
 
     Fruit fruit;
 
@@ -174,7 +174,7 @@ TEST test1(void) {
 
 int main(void) {
     TESTS_INIT();
-    RUN_TEST(test1);
+    RUN_TEST(test_general);
     TESTS_SHOW_RESULTS();
     return 0;
 }

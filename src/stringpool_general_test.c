@@ -53,7 +53,7 @@ void strpool_print_debug(strpool *p) {
     printf("\n");
 }
 
-TEST test1(void) {
+TEST test_general(void) {
     strpool pool = { 0 };
     int err = strpool_create(&pool);
     ASSERT(err == 0);
@@ -249,6 +249,11 @@ TEST test1(void) {
     printfd("Removed all.");
     strpool_print_debug(&pool);
 
+    ASSERT_INT_NEQ(pool.i_first_free_node, -1);
+    ASSERT_INT(pool.nodes[0].i_next_node, -1);
+    ASSERT_INT(pool.nodes[0].free_chunks, pool.capacity);
+    ASSERT_INT(pool.nodes[0].free_chunks, 2048);
+
     strpool_destroy(&pool);
     exit(0);
     TEST_PASS;
@@ -256,7 +261,7 @@ TEST test1(void) {
 
 int main (void) {
     TESTS_INIT();
-    RUN_TEST(test1);
+    RUN_TEST(test_general);
     TESTS_SHOW_RESULTS();
 }
 

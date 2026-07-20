@@ -87,9 +87,17 @@ int pfx(_grow)(Slot *s, int new_capacity) {
 
 
 // @Returns error.
-int pfx(create)(Slot *s) {
+int pfx(create_with_allocator)(Slot *s, SLOT__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data) {
     *s = (Slot) { 0 };
+    s->allocator = allocator;
+    s->allocator_user_data = allocator_user_data;
     return pfx(_grow)(s, 2); // DEFAULT CAPACITY.
+}
+
+
+// @Returns error.
+int pfx(create)(Slot *s) {
+    return pfx(create_with_allocator)(s, NULL, NULL);
 }
 
 void pfx(free)(Slot *s) {
