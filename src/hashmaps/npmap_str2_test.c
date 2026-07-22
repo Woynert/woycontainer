@@ -47,7 +47,7 @@ void print_pairs(const Map *m) {
         pri(Node) * node = m->hashmap[i];
         if (pri(node_is_empty)(m, node)) { continue; }
         strpool__str stored_key = strpool_get(&m->strpool, node->key);
-        printfd("%-4d: %"PRIstr" = %s", node->key, PRIstrarg(stored_key), node->value.name);
+        printfd("(i %-4d)(strkey %-4d): %"PRIstr" = %s", i, node->key, PRIstrarg(stored_key), node->value.name);
     }
 }
 
@@ -220,15 +220,16 @@ TEST test_general(void) {
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
+    printfd("\n---->>> Reinserting APPLE.");
 
-    key = cstr_SL("KIWI");
-    fruit = (Fruit) { "Kiwi" };
+    key = cstr_SL("APPLE");
+    fruit = (Fruit) { "Apple" };
     err = pub(upsert)(m, key, fruit);
     ASSERT_INT(err, 0);
     print_pairs(m);
     result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(str_equals(cstr(result->name), cstr(fruit.name)));
     {
-        Fruit to_find[] = { makefruit("Banana"), makefruit("Pineapple"), makefruit("Kiwi") };
+        Fruit to_find[] = { makefruit("Banana"), makefruit("Pineapple"), makefruit("Apple") };
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
@@ -238,7 +239,7 @@ TEST test_general(void) {
     ASSERT_INT(err, 0);
     print_pairs(m);
     {
-        Fruit to_find[] = { makefruit("Banana"), makefruit("Pineapple"), makefruit("Kiwi"), makefruit("Mango") };
+        Fruit to_find[] = { makefruit("Banana"), makefruit("Pineapple"), makefruit("Apple"), makefruit("Mango") };
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
