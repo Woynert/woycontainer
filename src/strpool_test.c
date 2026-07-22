@@ -36,14 +36,14 @@ void strpool_print_debug(strpool *p) {
 
     printf("\n");
     printf("Pool capacity %d\n", p->capacity);
-    printf(ANSI_RED"Printing free nodes\n"ANSI_RESET);
+    printf(ANSI_GRE"Printing free nodes\n"ANSI_RESET);
     while (i_node >= 0) {
         node = &p->nodes[i_node];
         printf("chunks %-5d start %-5d end %-5d next %-5d\n", node->free_chunks, i_node, i_node + node->free_chunks, node->i_next_node);
         i_node = node->i_next_node;
     }
 
-    printf(ANSI_RED"Printing pairs (unordered)\n"ANSI_RESET);
+    printf(ANSI_GRE"Printing pairs (unordered)\n"ANSI_RESET);
     for (int i = 0; i < p->views.count; ++i) {
         int userid = p->views.itemid_to_userid[i];
         str mystr = strpool_get(p, userid);

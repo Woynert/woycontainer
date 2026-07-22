@@ -17,13 +17,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define STRPOOL__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, ssize_t size, int align)
+
+#define STRPOOL__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, size_t size, int align)
 static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator);
 
+
 typedef struct strpool__str {
-    char *data;
+    const char *data;
     int size;
 } strpool__str;
+
 
 typedef struct strpool__view {
     int offset; /* Offset from buf start. Aka. index into pool->nodes[]. */
@@ -34,13 +37,16 @@ typedef struct strpool__view {
 #define SLOT__TYPE strpool__view
 #include "slot.h"
 
+
 typedef struct strpool__Node strpool__Node;
 typedef struct strpool__Node {
     int free_chunks;
     int i_next_node; // Index to nodes.
 } strpool__Node;
 
+
 #define STRPOOL_CHUNK ((int)sizeof(strpool__Node))
+
 
 typedef struct strpool{
     struct {
@@ -58,7 +64,24 @@ typedef struct strpool{
 } strpool;
 
 
-int strpool__grow(strpool *p, int min_size);
+
+int          strpool_create(strpool *p);
+int          strpool_create_with_allocator(strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data);
+void         strpool_destroy(strpool *p);
+int          strpool_append(strpool *p, strpool__str view);
+strpool__str strpool_get(const strpool *p, int view_id);
+int          strpool_remove(strpool *p, int view_id);
+
+int            strpool__grow(strpool *p, int min_size);
+strpool__Node *strpool__get_node(strpool *p, int i);
+int            strpool__find_node_just_before(strpool *p, int target_offset);
+void           strpool__integrate_new_free_node(strpool *p, int i_curr, int curr_chunks);
+int            strpool__find_space(strpool *p, int space, int *out_i_prev_node);
+static int     strpool__pow2roundup (int x);
+static int     strpool__div_ceil(int x, int y);
+static int     strpool__int_max(int x, int y) { return x > y ? x : y; }
+static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator);
+
 
 
 /// @Returns Error.
@@ -88,40 +111,31 @@ int strpool_create(strpool *p) {
 }
 
 
-void strpool_destroy(strpool *p) {
-    STRPOOL__ALLOC_PROTOTYPE(*allocator) = p->allocator != NULL ? p->allocator : strpool__default_allocator;
-    allocator(p->allocator_user_data, p->nodes, 0, 0);
-    strpool__view_Slot_free(&p->views);
-    *p = (strpool) { 0 };
+
+// https://stackoverflow.com/questions/2745074
+// WARNING: Only positive integers!!!
+static inline int strpool__div_ceil(int x, int y) {
+    return (x % y) ? x / y + 1 : x / y;
+}
+
+
+// https://stackoverflow.com/a/365068
+// Round up to next higher power of 2 (return x if it's already a power of 2).
+static inline int strpool__pow2roundup (int x) {
+    if (x < 0) { return 0; }
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    return x+1;
 }
 
 
 strpool__Node *strpool__get_node(strpool *p, int i) {
     if (i < 0 || i >= p->capacity) { return NULL; }
     return &p->nodes[i];
-}
-
-
-/// @param[out] out_i_prev_node. Index for the node previous to the one with space.
-/// @Returns id or -1 on error.
-int strpool__find_space(strpool *p, int space, int *out_i_prev_node) {
-    int i_prev_node = -1;
-    int i_node = p->i_first_free_node; 
-    strpool__Node *node = strpool__get_node(p, i_node);
-    while (node != NULL) {
-        if ((node->free_chunks * STRPOOL_CHUNK) >= space) {
-            *out_i_prev_node = i_prev_node;
-            return i_node;
-        } else {
-            i_prev_node = i_node;
-            i_node = node->i_next_node;
-            if (i_node < i_prev_node) {
-                return -1;
-            }
-            node = strpool__get_node(p, i_node);
-        }
-    }
-    return -1;
 }
 
 
@@ -139,32 +153,6 @@ int strpool__find_node_just_before(strpool *p, int target_offset) {
         if (i_node < i_prev_node) { break; }
     }
     return i_prev_node;
-}
-
-
-static inline int strpool__int_max(int x, int y) { return x > y ? x : y; }
-
-
-// https://stackoverflow.com/questions/2745074
-// WARNING: Only positive integers!!!
-static inline int strpool__div_ceil(int x, int y) {
-    return (x % y) ? x / y + 1 : x / y;
-}
-
-
-// https://stackoverflow.com/a/365068
-// Round up to next higher power of 2 (return x if it's already a power of 2).
-static inline int strpool__pow2roundup (int x)
-{
-    if (x < 0)
-        return 0;
-    --x;
-    x |= x >> 1;
-    x |= x >> 2;
-    x |= x >> 4;
-    x |= x >> 8;
-    x |= x >> 16;
-    return x+1;
 }
 
 
@@ -217,7 +205,7 @@ int strpool__grow(strpool *p, int min_size) {
     if (new_capacity < p->capacity) { return -1; }
 
     STRPOOL__ALLOC_PROTOTYPE(*allocator) = p->allocator != NULL ? p->allocator : strpool__default_allocator;
-    strpool__Node *new_nodes = allocator(p->allocator_user_data, p->nodes, (ssize_t)new_capacity * STRPOOL_CHUNK, STRPOOL_CHUNK);
+    strpool__Node *new_nodes = allocator(p->allocator_user_data, p->nodes, (size_t)new_capacity * STRPOOL_CHUNK, STRPOOL_CHUNK);
     if (new_nodes == NULL) { return -1; }
     p->nodes = new_nodes;
 
@@ -232,7 +220,39 @@ int strpool__grow(strpool *p, int min_size) {
 }
 
 
-/// @Returns index or Error.
+void strpool_destroy(strpool *p) {
+    STRPOOL__ALLOC_PROTOTYPE(*allocator) = p->allocator != NULL ? p->allocator : strpool__default_allocator;
+    allocator(p->allocator_user_data, p->nodes, 0, 0);
+    strpool__view_Slot_free(&p->views);
+    *p = (strpool) { 0 };
+}
+
+
+/// @param[out] out_i_prev_node. Index for the node previous to the one with space.
+/// @Returns id or -1 on error.
+int strpool__find_space(strpool *p, int space, int *out_i_prev_node) {
+    int i_prev_node = -1;
+    int i_node = p->i_first_free_node; 
+    strpool__Node *node = strpool__get_node(p, i_node);
+    while (node != NULL) {
+        if ((node->free_chunks * STRPOOL_CHUNK) >= space) {
+            *out_i_prev_node = i_prev_node;
+            return i_node;
+        } else {
+            i_prev_node = i_node;
+            i_node = node->i_next_node;
+            if (i_node < i_prev_node) {
+                return -1;
+            }
+            node = strpool__get_node(p, i_node);
+        }
+    }
+    return -1;
+}
+
+
+/// @returns index or -1.
+/// @reval   -1 Error.
 int strpool_append(strpool *p, strpool__str view) {
     int i_node_prev = -1;
     int i_node = -1;
@@ -244,15 +264,15 @@ int strpool_append(strpool *p, strpool__str view) {
         int err = strpool__grow(p, strpool__int_max(p->capacity * 2, view.size));
         if (err != 0) { return -1; }
         i_node = strpool__find_space(p, view.size, &i_node_prev);
-        if (i_node == -1) { return -2; }
+        if (i_node == -1) { return -1; }
     }
 
     // Check early for view space (for easy bail out in case of OOM).
 
     int view_id = strpool__view_Slot_append(&p->views, (strpool__view) { 0 });
-    if (view_id == -1) { return -3; }
+    if (view_id == -1) { return -1; }
     strpool__view *new_view = strpool__view_Slot_get(&p->views, view_id);
-    if (new_view == NULL) { return -4; }
+    if (new_view == NULL) { return -1; }
 
     // Calculate chunks.
 
@@ -304,7 +324,7 @@ int strpool_remove(strpool *p, int view_id) {
 
 
 /// @Returns view or INVALID_VIEW If not found. An invalid view is .data == NULL.
-strpool__str strpool_get(strpool *p, int view_id) {
+strpool__str strpool_get(const strpool *p, int view_id) {
     strpool__view *view = strpool__view_Slot_get(&p->views, view_id);
     if (view == NULL) {
         return (strpool__str) { .data = NULL, .size = 0, };

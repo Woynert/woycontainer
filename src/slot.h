@@ -12,10 +12,8 @@
 
 #include <stdalign.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #ifndef SLOT__TYPE
 #define SLOT__TYPE int
@@ -31,7 +29,6 @@
 #define pfx(name) SLOT__TOKCAT(SLOT__TOKCAT(SLOT__NAMESPACE, _), name)
 #define TYPE SLOT__TYPE
 #define Slot SLOT__NAMESPACE
-
 #define SLOT__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, ssize_t size, int align)
 static SLOT__ALLOC_PROTOTYPE(pfx(_default_allocator));
 
@@ -54,8 +51,6 @@ int pfx(_grow)(Slot *s, int new_capacity) {
 
     SLOT__ALLOC_PROTOTYPE(*allocator) = s->allocator != NULL ? s->allocator : pfx(_default_allocator);
 
-    bool free_on_failure = s->items == NULL; // In case it's first allocation. (Malloc).
-
     int* new_userid_to_itemid = (int*) allocator(s->allocator_user_data, s->userid_to_itemid, (ssize_t)new_capacity * (ssize_t)sizeof(int), alignof(int));
     int* new_itemid_to_userid = (int*) allocator(s->allocator_user_data, s->itemid_to_userid, (ssize_t)new_capacity * (ssize_t)sizeof(int), alignof(int));
     TYPE* new_items           = (TYPE*)allocator(s->allocator_user_data, s->items           , (ssize_t)new_capacity * (ssize_t)sizeof(TYPE), alignof(TYPE));
@@ -64,7 +59,7 @@ int pfx(_grow)(Slot *s, int new_capacity) {
         || new_itemid_to_userid == NULL
         || new_items == NULL
     ) {
-        if (free_on_failure) {
+        if (s->items == NULL) { // In case it's first time allocation free on failure.
             if (new_userid_to_itemid != NULL) { allocator(s->allocator_user_data, new_userid_to_itemid, 0, 0); }
             if (new_itemid_to_userid != NULL) { allocator(s->allocator_user_data, new_itemid_to_userid, 0, 0); }
             if (new_items            != NULL) { allocator(s->allocator_user_data, new_items           , 0, 0); }
@@ -72,16 +67,16 @@ int pfx(_grow)(Slot *s, int new_capacity) {
         return -1;
     }
 
-    // Update available free slots.
+    // Init new slots.
     for (int i = s->capacity; i < new_capacity; ++i) {
         new_itemid_to_userid[i] = i;
         new_userid_to_itemid[i] = i;
     }
 
-    s->capacity   = new_capacity;
+    s->capacity         = new_capacity;
     s->userid_to_itemid = new_userid_to_itemid;
-    s->itemid_to_userid  = new_itemid_to_userid;
-    s->items      = new_items;
+    s->itemid_to_userid = new_itemid_to_userid;
+    s->items            = new_items;
     return 0;
 }
 
@@ -96,26 +91,14 @@ int pfx(create_with_allocator)(Slot *s, SLOT__ALLOC_PROTOTYPE(*allocator), void 
 
 
 // @Returns error.
-int pfx(create)(Slot *s) {
-    return pfx(create_with_allocator)(s, NULL, NULL);
-}
+int pfx(create)(Slot *s) { return pfx(create_with_allocator)(s, NULL, NULL); }
+
 
 void pfx(free)(Slot *s) {
+    /* @Note: grow will return -1 (Error) But we can just ignore it.
+       Because at that point it would have already free all. */
     pfx(_grow)(s, 0);
     *s = (Slot) { 0 };
-}
-
-void pfx(print_debug)(const Slot *s) {
-    printf("\ncap %d count %d", s->capacity, s->count);
-    printf("\nuserid_to_itemid ");
-    for (int i = 0; i < s->capacity; ++i) {
-        printf("%04d ", s->userid_to_itemid[i]);
-    }
-    printf("\nitemid_to_userid ");
-    for (int i = 0; i < s->capacity; ++i) {
-        printf("%04d ", s->itemid_to_userid[i]);
-    }
-    printf("\n");
 }
 
 
@@ -135,7 +118,7 @@ int pfx(append)(Slot *s, TYPE item) {
 
 
 // @Returns TYPE or NULL if not found.
-TYPE *pfx(get)(Slot *s, int user_id) {
+TYPE *pfx(get)(const Slot *s, int user_id) {
     if (user_id < 0 || user_id > s->capacity) { return NULL; }
     int item_id = s->userid_to_itemid[user_id];
     if (item_id > s->count) { return NULL; }
@@ -150,7 +133,6 @@ int pfx(pop)(Slot *s, int user_id) {
     // Swap items.
     int item_id = s->userid_to_itemid[user_id];
     s->items[item_id] = s->items[s->count -1];
-    //printf("[ %d %d ]\n", item_id, s->count -1);
     // Swap itemid_to_userid.
     int bk = s->itemid_to_userid[item_id];
     s->itemid_to_userid[item_id] = s->itemid_to_userid[s->count -1];
@@ -161,6 +143,20 @@ int pfx(pop)(Slot *s, int user_id) {
     // Pop.
     --s->count;
     return 0;
+}
+
+
+void pfx(print_debug)(const Slot *s) {
+    printf("\ncap %d count %d", s->capacity, s->count);
+    printf("\nuserid_to_itemid ");
+    for (int i = 0; i < s->capacity; ++i) {
+        printf("%04d ", s->userid_to_itemid[i]);
+    }
+    printf("\nitemid_to_userid ");
+    for (int i = 0; i < s->capacity; ++i) {
+        printf("%04d ", s->itemid_to_userid[i]);
+    }
+    printf("\n");
 }
 
 

@@ -61,7 +61,7 @@
 #define TESTS_INIT()         \
     int _woytest_count = 0;  \
     int _woytest_passed = 0; \
-    printf("TESTS STARTING\n---\n");
+    printf("TESTS STARTING ("WOYTEST_BOLD __FILE_NAME__ WOYTEST_RESET")\n---\n");
 
 #define RUN_TEST(FUNC)                                                          \
     do {                                                                        \

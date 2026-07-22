@@ -1,0 +1,283 @@
+/*
+   npmap is for nullprogram.com inspired map.
+
+   FEATURES:
+   * Strings as keys.
+   * Unlimited growth. ????? Show me then.
+*/
+
+#include <stdalign.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include "../strpool.h"
+#include "src/portable_utils.h"
+
+
+#ifndef MAP__TYPE
+#define MAP__TYPE float
+#endif
+#define MAP__TOKCAT_(a, b) a ## b
+#define MAP__TOKCAT(a, b) MAP__TOKCAT_(a, b)
+#ifndef MAP__NAMESPACE
+#define MAP__NAMESPACE MAP__TOKCAT(MAP__TYPE, _map)
+#endif
+#define pub(name) MAP__TOKCAT(MAP__TOKCAT(MAP__NAMESPACE, _), name)
+#define pri(name) MAP__TOKCAT(MAP__TOKCAT(MAP__NAMESPACE, __), name)
+#define Map MAP__NAMESPACE
+#define MAP__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
+#define DEFAULT_SIZE_EXP 2
+
+
+typedef struct Node {
+    int key;           // Index into strpool.
+    MAP__TYPE value;
+} Node;
+
+
+typedef struct Map {
+    strpool strpool;
+
+    Node *items;
+    int size_exp;
+    int count;     // Number of valid items stored.
+
+    struct {
+        Node **hashmap; // The hashmap is separate from our main collection.
+    };
+
+    MAP__ALLOC_PROTOTYPE(*allocator);
+    void *allocator_userdata;
+} Map;
+
+
+static MAP__ALLOC_PROTOTYPE(pri(default_allocator));
+
+
+bool str_equals(strpool__str str1, strpool__str str2) {
+    if (str1.size != str2.size) { return false; }
+    return !str1.size || !memcmp(str1.data, str2.data, (size_t)str1.size);
+    // str1.size seems superfluous but it's necessary.
+    // See https://nullprogram.com/blog/2025/01/19/#strings
+}
+
+
+uint64_t hash_str64(strpool__str s) {
+    uint64_t h = 0x100;
+    for (ptrdiff_t i = 0; i < s.size; i++) {
+        h ^= s.data[i] & 255;
+        h *= 1111111111111111111;
+    }
+    return h;
+}
+
+
+int32_t ht_lookup(uint64_t hash, int exp, int32_t idx) {
+    uint32_t mask = ((uint32_t)1 << exp) - 1;
+    uint32_t step = (uint32_t)(hash >> (64 - exp) | 1);
+    return (int32_t)(((uint32_t)idx + step) & mask);
+}
+
+
+Node **lookup(Map *m, strpool__str key, int *out_idx) {
+    uint64_t h = hash_str64(key);
+    for (int i = (int)h;;)
+    {
+        i = ht_lookup(h, m->size_exp, i);
+        Node *node = m->hashmap[i];
+
+        if (node == NULL) { // Found empty or available!
+            if (m->count == ((1 << m->size_exp) -1)) {
+                /* Refusing to give away the last empty element. We
+                   need at least one empty element to know when to stop
+                   iterating. Also: We're out of memory. */
+                return NULL;
+            }
+            if (out_idx != NULL) { *out_idx = i; }
+            return &m->hashmap[i];
+        }
+        else if (node != NULL) {
+            // Get string from strpol
+            strpool__str stored_key = strpool_get(&m->strpool, node->key);
+            if (stored_key.data == NULL) {
+                printfd("error: Should never happen.");
+            }
+            if (str_equals(key, stored_key)) { // Found it.
+                if (out_idx != NULL) { *out_idx = i; }
+                return &m->hashmap[i];
+            }
+        }
+    }
+}
+
+int grow(Map *old_m, int new_size_exp);
+
+/// @Returns error.
+int upsert(Map *m, strpool__str key, MAP__TYPE value) {
+    if (m->count >= ((1 << m->size_exp)-1)) {
+        // No space, regrow.
+        int err = grow(m, m->size_exp +1);
+        if (err != 0) { return -1; }
+        //return -1;
+    }
+
+    Node *new_node = NULL;
+    int new_node_idx = -1;
+
+    Node **node_slot = lookup(m, key, &new_node_idx);
+
+    if (node_slot == NULL) {
+        // Out of memory.
+        // Grow, rehash.
+        //grow(m, m->size_exp +1);
+        // Try again.
+        //node_slot = lookup(m, key, &new_node_idx);
+        //if (node_slot == NULL) {
+            printfd(ANSI_RED"A");
+            return -1;
+        //}
+    }
+
+    if (*node_slot == NULL) { 
+        // This key didn't exist before.
+
+        int idx = strpool_append(&m->strpool, key);
+        if (idx == -1) {
+            printfd(ANSI_RED"B");
+            return -1;
+        }
+
+        new_node = &m->items[new_node_idx];
+        new_node->key = idx;
+
+        *node_slot = new_node;
+        ++m->count;
+    } else {
+        // Already exists.
+        new_node = *node_slot;
+    }
+
+    //printfd("Set it here mate! SUCESSS item_id (%d)", (int)((ptrdiff_t)(new_node - m->items)));
+    new_node->value = value;
+    return 0;
+}
+
+/// @Returns pointer to stored value or NULL.
+MAP__TYPE *get(Map *m, strpool__str key) {
+    Node **node_slot = lookup(m, key, NULL);
+    if (node_slot == NULL || *node_slot == NULL) { return NULL; }
+    return &(*node_slot)->value;
+}
+
+/// @Returns error.
+int map_remove(Map *m, strpool__str key) {
+    Node **node_slot = lookup(m, key, NULL);
+    if (node_slot == NULL || *node_slot == NULL) { return -1; }
+    strpool_remove(&m->strpool, (*node_slot)->key);
+    *node_slot = NULL;
+    --m->count;
+    return 0;
+}
+
+
+void rehash(Map *old_m, Map *new_m);
+
+int grow(Map *old_m, int new_size_exp) {
+
+    if (new_size_exp < old_m->size_exp) { return -1; }
+
+    Map new_map = { 0 };
+    Map *new_m = &new_map;
+
+    new_m->size_exp = new_size_exp;
+    new_m->allocator = old_m->allocator;
+    new_m->allocator_userdata = old_m->allocator_userdata;
+    new_m->strpool = old_m->strpool;
+
+    MAP__ALLOC_PROTOTYPE(*allocator) = new_m->allocator ? new_m->allocator : pri(default_allocator);
+
+    new_m->items   = (Node*) allocator(NULL, (size_t)(1 << new_m->size_exp) * sizeof(Node) , alignof(Node), new_m->allocator_userdata);
+    new_m->hashmap = (Node**)allocator(NULL, (size_t)(1 << new_m->size_exp) * sizeof(Node*), alignof(Node*), new_m->allocator_userdata);
+
+    if (new_m->items == NULL || new_m->hashmap == NULL) {
+        if (new_m->items   != NULL) { allocator(new_m->items  , 0, 0, old_m->allocator_userdata); }
+        if (new_m->hashmap != NULL) { allocator(new_m->hashmap, 0, 0, old_m->allocator_userdata); }
+        return -1;
+    }
+
+    memset(new_m->items  , 0, (1 << new_m->size_exp) * sizeof(*new_m->items));
+    memset(new_m->hashmap, 0, (1 << new_m->size_exp) * sizeof(*new_m->hashmap));
+
+    if (old_m->size_exp > 0) { rehash(old_m, new_m); }
+
+    // Free old map.
+
+    if (old_m->items != NULL) { allocator(old_m->items  , 0, 0, old_m->allocator_userdata); }
+    if (old_m->items != NULL) { allocator(old_m->hashmap, 0, 0, old_m->allocator_userdata); }
+
+    *old_m = *new_m;
+
+    return 0;
+}
+
+
+// @Note. Should only be called from 'grow' function.
+void rehash(Map *old_m, Map *new_m) {
+
+    // Rehash every valid entry.
+
+    for (int i = 0; i < (1 << old_m->size_exp); ++i) {
+        Node *node = old_m->hashmap[i];
+        if (node == NULL) { continue; }
+
+        strpool__str stored_key = strpool_get(&old_m->strpool, node->key);
+        if (stored_key.data == NULL) { printfd("ERR: Couldn't find stored key."); continue; }
+
+        // Insert.
+
+        int item_id;
+        Node **new_node = lookup(new_m, stored_key, &item_id);
+        *new_node = &new_m->items[item_id];
+        (*new_node)->key = node->key;
+        (*new_node)->value = node->value;
+        ++new_m->count;
+    }
+}
+
+
+Map create_with_allocator(MAP__ALLOC_PROTOTYPE(*allocator), void *user_data) {
+    Map m = { 0 };
+    m.allocator = allocator;
+    m.allocator_userdata = user_data;
+    strpool_create(&m.strpool);
+    grow(&m, DEFAULT_SIZE_EXP);
+    return m;
+}
+
+
+Map create(void) {
+    return create_with_allocator(NULL, NULL);
+}
+
+
+void map_free(Map *m) {
+    strpool_destroy(&m->strpool);
+    MAP__ALLOC_PROTOTYPE(*allocator) = m->allocator ? m->allocator : pri(default_allocator);
+    if (m->items != NULL) { allocator(m->items  , 0, 0, m->allocator_userdata); }
+    if (m->items != NULL) { allocator(m->hashmap, 0, 0, m->allocator_userdata); }
+    *m = (Map) { 0 };
+}
+
+
+static MAP__ALLOC_PROTOTYPE(pri(default_allocator)) {
+    // New allocation: ptr == NULL && size > 0
+    // Reallocation:   ptr != NULL && size > 0
+    // Free:           ptr != NULL && size == 0
+    (void)align; (void)user_data; // Unused: malloc guarantees alignment.
+    void* result = NULL;
+    if      (size == 0)   { free(ptr);                   }
+    else if (ptr == NULL) { result = malloc(size);       }
+    else                  { result = realloc(ptr, size); }
+    return result;
+}
+
