@@ -255,6 +255,7 @@ size_t pfx(_size_t_min) (size_t a, size_t b) { return a > b ? b : a; }
 
 
 int pfx(_hash) (const Map *m, const KEY key) {
+    // TODO: Use a real hash function.
     int key_fragment = 0;
     memcpy(&key_fragment, &key, pfx(_size_t_min)(sizeof(int), sizeof(KEY)));
     #define MAP__PYTHON_MODULO(n, M) ((((n) % (M)) + (M)) % (M))

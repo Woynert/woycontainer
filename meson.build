@@ -59,3 +59,6 @@ test('npmap_str0_test', npmap_str0_test)
 
 npmap_str1_test = executable('npmap_str1_test', './src/hashmaps/npmap_str1_test.c')
 test('npmap_str1_test', npmap_str1_test)
+
+npmap_str2_test = executable('npmap_str2_test', './src/hashmaps/npmap_str2_test.c')
+test('npmap_str2_test', npmap_str2_test)
