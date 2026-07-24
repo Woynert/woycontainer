@@ -6,6 +6,7 @@
 #include "stdlib.h"  // exit
 #include "limits.h"
 #include "math.h"
+#include <stdint.h>
 
 typedef int64_t i64;
 
@@ -15,14 +16,14 @@ typedef int64_t i64;
 #include <time.h> // nanosleep
 #endif
 static void sleep_ms(int milliseconds){
-#ifdef WIN32
+    #ifdef WIN32
     Sleep(milliseconds);
-#else
+    #else
     struct timespec ts;
     ts.tv_sec = milliseconds / 1000;
     ts.tv_nsec = (milliseconds % 1000) * 1000000;
     nanosleep(&ts, NULL);
-#endif
+    #endif
 }
 
 #ifdef _WIN32
@@ -30,15 +31,14 @@ static void sleep_ms(int milliseconds){
 #else // Linux, macOS, etc.
 #include <sys/time.h>
 #endif
-
 static long get_system_ms(void) {
-#ifdef _WIN32
+    #ifdef _WIN32
     return GetTickCount64();
-#else // Linux, macOS, etc.
+    #else // Linux, macOS, etc.
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
-#endif
+    #endif
 }
 
 static inline size_t size_t_max(size_t a, size_t b)                     { return a > b ? a : b; }
@@ -68,7 +68,7 @@ static int int_digit_places (int n) {
     return 10;
 }
 
-#define PYTHON_MODULO(n, M) ((((n) % (M)) + (M)) % (M))
+// #define PYTHON_MODULO(n, M) ((((n) % (M)) + (M)) % (M))
 
 #define ANSI_RESET "\033[0m"
 #define ANSI_RED "\033[31m"
@@ -112,11 +112,31 @@ static int int_digit_places (int n) {
 //#define lengthof(s)  (countof(s) - 1)
 
 #define foreachi(type_i, type_item, iter, array, size) \
-	struct { type_i index; type_item *ref; } iter = { .index = 0, .ref = (array) }; iter.index < size; ++iter.index, ++iter.ref
+    struct { type_i index; type_item *ref; } iter = { .index = 0, .ref = (array) }; iter.index < size; ++iter.index, ++iter.ref
 #define foreach(type_item, iter, array, size) \
-	foreachi(int, type_item, iter, array, size)
+    foreachi(int, type_item, iter, array, size)
 #define foreach_auto(type_item, iter, array) \
-	foreachi(int, type_item, iter, array, countofi(array))
+    foreachi(int, type_item, iter, array, countofi(array))
 
+
+// https://gist.github.com/dgoguerra/7194777?permalink_comment_id=6272723#gistcomment-6272723
+#define PRIbyte "%s"
+#define PRIbytearg(x) byte_human_format((uint64_t)(x))
+const char *byte_human_format(uint64_t b) {
+    enum { BUF_EXP_SIZE = 4, BUF_SIZE = 32 };
+    static int idx = 0;
+    static char storage_buf[1 << BUF_EXP_SIZE][BUF_SIZE];
+    char *buf = storage_buf[idx];
+    idx = (idx + 1) & ((1 << BUF_EXP_SIZE) -1);
+    snprintf(buf, BUF_SIZE, "%.02lf(%s)",
+    b >= (1ull << 40) ? (double)(b) / (double)(1ull << 40) :
+    b >= (1ull << 30) ? (double)(b) / (double)(1ull << 30) :
+    b >= (1ull << 20) ? (double)(b) / (double)(1ull << 20) :
+    b >= (1ull << 10) ? (double)(b) / (double)(1ull << 10) : (double)(b),
+    b >= (1ull << 40) ? "TiB" : b >= (1ull << 30) ? "GiB" :
+    b >= (1ull << 20) ? "MiB" : b >= (1ull << 10) ? "KiB" : "B");
+    return buf;
+    // 28 bytes -> "9223372036854775807.00(TiB)\0"
+}
 
 #endif

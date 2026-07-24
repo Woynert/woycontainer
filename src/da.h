@@ -51,7 +51,7 @@
 #define TYPE DYNA__TYPE
 #define Dyna DYNA__NAMESPACE
 
-#define DYNA__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, size_t size, int align)
+#define DYNA__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
 
 typedef struct {
     int capacity;
@@ -114,7 +114,7 @@ static inline void pfx(free) (Dyna *da) {
     if (da->items != NULL) {
         // free.
         DYNA__ALLOC_PROTOTYPE(*allocator) = da->allocator ? da->allocator : pfx(_default_allocator);
-        allocator(da->allocator_user_data, da->items, 0, alignof(TYPE));
+        allocator(da->items, 0, alignof(TYPE), da->allocator_user_data);
     }
     *da = (Dyna) { 0 };
 }
@@ -135,7 +135,7 @@ static int pfx(resize) (Dyna *da, int new_capacity) {
         else { realloc(da->items, size); }
     */
 
-    new_ptr = (TYPE *)allocator(da->allocator_user_data, da->items, bytes, alignof(TYPE));
+    new_ptr = (TYPE *)allocator(da->items, bytes, alignof(TYPE), da->allocator_user_data);
     if (new_ptr == NULL) { return -1; }
 
     da->capacity = new_capacity;

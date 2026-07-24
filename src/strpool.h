@@ -18,7 +18,7 @@
 #include <string.h>
 
 
-#define STRPOOL__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, size_t size, int align)
+#define STRPOOL__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
 static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator);
 
 
@@ -71,13 +71,14 @@ void         strpool_destroy(strpool *p);
 int          strpool_append(strpool *p, strpool__str view);
 strpool__str strpool_get(const strpool *p, int view_id);
 int          strpool_remove(strpool *p, int view_id);
+size_t       strpool_report_memory(const strpool *p);
 
 int            strpool__grow(strpool *p, int min_size);
-strpool__Node *strpool__get_node(strpool *p, int i);
-int            strpool__find_node_just_before(strpool *p, int target_offset);
+strpool__Node *strpool__get_node(const strpool *p, int i);
+int            strpool__find_node_just_before(const strpool *p, int target_offset);
 void           strpool__integrate_new_free_node(strpool *p, int i_curr, int curr_chunks);
-int            strpool__find_space(strpool *p, int space, int *out_i_prev_node);
-static int     strpool__pow2roundup (int x);
+int            strpool__find_space(const strpool *p, int space, int *out_i_prev_node);
+static int     strpool__pow2roundup(int x);
 static int     strpool__div_ceil(int x, int y);
 static int     strpool__int_max(int x, int y) { return x > y ? x : y; }
 static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator);
@@ -91,7 +92,7 @@ int strpool_create_with_allocator(strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocato
     p->allocator_user_data = allocator_user_data;
     p->i_first_free_node = -1;
 
-    int err = strpool__view_Slot_create(&p->views);
+    int err = strpool__view_Slot_create_with_allocator(&p->views, allocator, allocator_user_data);
     if (err != 0) {
         return -1;
     }
@@ -133,7 +134,7 @@ static inline int strpool__pow2roundup (int x) {
 }
 
 
-strpool__Node *strpool__get_node(strpool *p, int i) {
+strpool__Node *strpool__get_node(const strpool *p, int i) {
     if (i < 0 || i >= p->capacity) { return NULL; }
     return &p->nodes[i];
 }
@@ -141,7 +142,7 @@ strpool__Node *strpool__get_node(strpool *p, int i) {
 
 /// @Returns id.
 /// @Retval -1 If not found (or root).
-int strpool__find_node_just_before(strpool *p, int target_offset) {
+int strpool__find_node_just_before(const strpool *p, int target_offset) {
     int i_prev_node = -1;
     int i_node = p->i_first_free_node;
     for (;;) {
@@ -205,7 +206,7 @@ int strpool__grow(strpool *p, int min_size) {
     if (new_capacity < p->capacity) { return -1; }
 
     STRPOOL__ALLOC_PROTOTYPE(*allocator) = p->allocator != NULL ? p->allocator : strpool__default_allocator;
-    strpool__Node *new_nodes = allocator(p->allocator_user_data, p->nodes, (size_t)new_capacity * STRPOOL_CHUNK, STRPOOL_CHUNK);
+    strpool__Node *new_nodes = (strpool__Node *)allocator(p->nodes, (size_t)new_capacity * STRPOOL_CHUNK, STRPOOL_CHUNK, p->allocator_user_data);
     if (new_nodes == NULL) { return -1; }
     p->nodes = new_nodes;
 
@@ -222,7 +223,7 @@ int strpool__grow(strpool *p, int min_size) {
 
 void strpool_destroy(strpool *p) {
     STRPOOL__ALLOC_PROTOTYPE(*allocator) = p->allocator != NULL ? p->allocator : strpool__default_allocator;
-    allocator(p->allocator_user_data, p->nodes, 0, 0);
+    allocator(p->nodes, 0, 0, p->allocator_user_data);
     strpool__view_Slot_free(&p->views);
     *p = (strpool) { 0 };
 }
@@ -230,7 +231,7 @@ void strpool_destroy(strpool *p) {
 
 /// @param[out] out_i_prev_node. Index for the node previous to the one with space.
 /// @Returns id or -1 on error.
-int strpool__find_space(strpool *p, int space, int *out_i_prev_node) {
+int strpool__find_space(const strpool *p, int space, int *out_i_prev_node) {
     int i_prev_node = -1;
     int i_node = p->i_first_free_node; 
     strpool__Node *node = strpool__get_node(p, i_node);
@@ -333,23 +334,23 @@ strpool__str strpool_get(const strpool *p, int view_id) {
 }
 
 
-static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator) {
-    (void)align; (void)user_data; // Unused: malloc guarantees alignment.
+size_t strpool_report_memory(const strpool *p) {
+    size_t count = sizeof(strpool);
+    count += (size_t)p->capacity * sizeof(strpool__Node);
+    count += strpool__view_Slot_report_memory(&p->views);
+    return count;
+}
 
+
+static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator) {
     // New allocation: ptr == NULL && size > 0
     // Reallocation:   ptr != NULL && size > 0
     // Free:           ptr != NULL && size == 0
-
+    (void)align; (void)user_data; // Unused: malloc guarantees alignment.
     void* result = NULL;
-    if (size == 0) {
-        free(ptr);
-    } else {
-        if (ptr == NULL) {
-            result = malloc((size_t)size);
-        } else {
-            result = realloc(ptr, (size_t)size);
-        }
-    }
+    if      (size == 0)   { free(ptr);                   }
+    else if (ptr == NULL) { result = malloc(size);       }
+    else                  { result = realloc(ptr, size); }
     return result;
 }
 

@@ -119,9 +119,11 @@ TEST test_str(void) {
 #define makefruit(name) ((Fruit) { name })
 
 TEST test_general(void) {
-    Map map = pub(create)();
-    Map *m = &map;
     int err;
+    Map map = { 0 };
+    Map *m = &map;
+    err = pub(create)(m);
+    ASSERT_INT(err, 0);
 
     print_pairs(m);
 
@@ -184,21 +186,21 @@ TEST test_general(void) {
 
     // Try to gain some space back.
 
-    err = pub(map_remove)(m, key_apple);
+    err = pub(remove)(m, key_apple);
     ASSERT_INT(err, 0);
-    ASSERT_INT(m->count, (1 << m->size_exp) -2);
+    ASSERT_INT(m->count, 2);
     print_pairs(m);
     {
         Fruit to_find[] = { makefruit("Banana"), makefruit("Pear") };
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
-    err = pub(map_remove)(m, key_apple);
+    err = pub(remove)(m, key_apple);
     ASSERT_INT(err, -1);
 
-    err = pub(map_remove)(m, key_pear);
+    err = pub(remove)(m, key_pear);
     ASSERT_INT(err, 0);
-    ASSERT_INT(m->count, (1 << m->size_exp) -3);
+    ASSERT_INT(m->count, 1);
     
     printfd("\n---->>> Removed APPLE and Pear, should remain Banana.");
     print_pairs(m);
@@ -265,7 +267,7 @@ TEST test_general(void) {
         pri(Node) * node = m->hashmap[i];
         if (node == NULL) { continue; }
         strpool__str stored_key = strpool_get(&m->strpool, node->key);
-        err = pub(map_remove)(m, stored_key);
+        err = pub(remove)(m, stored_key);
         if (err != 0) {
             printfd(ANSI_RED"Failed to remove: %-4d: %"PRIstr" = %s", node->key, PRIstrarg(stored_key), node->value.name);
         } else {
@@ -277,7 +279,7 @@ TEST test_general(void) {
     print_pairs(m);
     ASSERT_INT(m->count, 0);
 
-    pub(map_free)(m);
+    pub(free)(m);
 
     TEST_PASS;
 }

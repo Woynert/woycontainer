@@ -26,12 +26,13 @@
 #define pri(name) MAP__TOKCAT(MAP__TOKCAT(MAP__NAMESPACE, __), name)
 #define Map MAP__NAMESPACE
 #define MAP__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
-#define DEFAULT_SIZE_EXP 2
+#define MAP__DEFAULT_SIZE_EXP 8
+#define MAP__REHASH_FACTOR 0.7
 
 
 typedef struct pri(Node) {
-    int key;           // Index into strpool.
     MAP__TYPE value;
+    int key;           // Index into strpool.
 } pri(Node);
 
 
@@ -54,7 +55,6 @@ typedef struct Map {
 
 /* A node is invalid when it points to the gravestone. */
 static inline bool pri(node_is_gravestone)  (const Map *m, const pri(Node) *node) { return node == &m->gravestone; }
-static inline bool pri(node_is_used)  (const Map *m, const pri(Node) *node) { return node != NULL && !pri(node_is_gravestone(m, node)); }
 static inline bool pri(node_is_empty) (const Map *m, const pri(Node) *node) { return node == NULL || pri(node_is_gravestone(m, node)); }
 
 
@@ -64,8 +64,7 @@ static MAP__ALLOC_PROTOTYPE(pri(default_allocator));
 bool pri(str_equals)(strpool__str str1, strpool__str str2) {
     if (str1.size != str2.size) { return false; }
     return !str1.size || !memcmp(str1.data, str2.data, (size_t)str1.size);
-    // str1.size seems superfluous but it's necessary.
-    // See https://nullprogram.com/blog/2025/01/19/#strings
+    // !str1.size it's necessary see https://nullprogram.com/blog/2025/01/19/#strings
 }
 
 
@@ -79,20 +78,26 @@ uint64_t pri(hash_str64)(strpool__str s) {
 }
 
 
+/*
 int32_t pri(ht_lookup)(uint64_t hash, int exp, int32_t idx) {
     uint32_t mask = ((uint32_t)1 << exp) - 1;
     uint32_t step = (uint32_t)(hash >> (64 - exp) | 1);
     return (int32_t)(((uint32_t)idx + step) & mask);
 }
+*/
 
 
 pri(Node) **pri(lookup)(Map *m, strpool__str key, int *out_idx, bool trying_to_insert) {
     pri(Node) **dest = NULL;
     uint64_t h = pri(hash_str64)(key);
 
+    uint32_t mask = ((uint32_t)1 << m->size_exp) - 1;          // MSI
+    uint32_t step = (uint32_t)(h >> (64 - m->size_exp) | 1);   // MSI
+
     for (int i = (int)h;;)
     {
-        i = pri(ht_lookup)(h, m->size_exp, i);
+       i = (int32_t)(((uint32_t)i + step) & mask);             // MSI
+
         pri(Node) *node = m->hashmap[i];
 
         if (node == NULL) {                                     // Found empty.
@@ -130,9 +135,9 @@ int pri(grow)(Map *old_m, int new_size_exp);
 
 /// @Returns error.
 int pub(upsert)(Map *m, strpool__str key, MAP__TYPE value) {
-    if (m->count >= ((1 << m->size_exp)-1)) {
-        int err = pri(grow)(m, m->size_exp +1);  // No space, regrow.
-        if (err != 0) { return -1; }
+    float factor = (float)m->count / (float)(1 << m->size_exp);
+    if (factor > MAP__REHASH_FACTOR) {
+        pri(grow)(m, m->size_exp +1);  // Regrow & rehash if pushing the optimal factor.
     }
 
     pri(Node) *new_node = NULL;
@@ -170,7 +175,7 @@ MAP__TYPE *pub(get)(Map *m, strpool__str key) {
 }
 
 /// @Returns error.
-int pub(map_remove)(Map *m, strpool__str key) {
+int pub(remove)(Map *m, strpool__str key) {
     pri(Node) **node_slot = pri(lookup)(m, key, NULL, false);
     if (node_slot == NULL || *node_slot == NULL) { return -1; }
     strpool_remove(&m->strpool, (*node_slot)->key);
@@ -242,30 +247,42 @@ void pri(rehash)(Map *old_m, Map *new_m) {
         (*new_node)->value = node->value;
         ++new_m->count;
     }
+
+    printfd("DEBUG: Rehashed.");
 }
 
 
-Map pub(create_with_allocator)(MAP__ALLOC_PROTOTYPE(*allocator), void *user_data) {
-    Map m = { 0 };
-    m.allocator = allocator;
-    m.allocator_userdata = user_data;
-    strpool_create(&m.strpool);
-    pri(grow)(&m, DEFAULT_SIZE_EXP);
-    return m;
+/// @Returns error.
+int pub(create_with_allocator)(Map *m, MAP__ALLOC_PROTOTYPE(*allocator), void *user_data) {
+    *m = (Map) { 0 };
+    m->allocator = allocator;
+    m->allocator_userdata = user_data;
+    strpool_create_with_allocator(&m->strpool, allocator, user_data);
+    return pri(grow)(m, MAP__DEFAULT_SIZE_EXP);
 }
 
 
-Map pub(create)(void) {
-    return pub(create_with_allocator)(NULL, NULL);
+/// @Returns error.
+int pub(create)(Map *m) {
+    return pub(create_with_allocator)(m, NULL, NULL);
 }
 
 
-void pub(map_free)(Map *m) {
+void pub(free)(Map *m) {
     strpool_destroy(&m->strpool);
     MAP__ALLOC_PROTOTYPE(*allocator) = m->allocator ? m->allocator : pri(default_allocator);
     if (m->items != NULL) { allocator(m->items  , 0, 0, m->allocator_userdata); }
     if (m->items != NULL) { allocator(m->hashmap, 0, 0, m->allocator_userdata); }
     *m = (Map) { 0 };
+}
+
+
+size_t pub(report_memory)(Map *m) {
+    size_t count = sizeof(Map);
+    count += (1 << m->size_exp) * sizeof(*m->items);
+    count += (1 << m->size_exp) * sizeof(*m->hashmap);
+    count += strpool_report_memory(&m->strpool);
+    return count;
 }
 
 
@@ -290,4 +307,4 @@ static MAP__ALLOC_PROTOTYPE(pri(default_allocator)) {
 #undef pri
 #undef Map
 #undef MAP__ALLOC_PROTOTYPE
-#undef DEFAULT_SIZE_EXP
+#undef MAP__DEFAULT_SIZE_EXP

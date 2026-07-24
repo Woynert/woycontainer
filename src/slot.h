@@ -25,11 +25,10 @@
 #ifndef SLOT__NAMESPACE
 #define SLOT__NAMESPACE SLOT__TOKCAT(SLOT__TYPE, _Slot)
 #endif
-
 #define pfx(name) SLOT__TOKCAT(SLOT__TOKCAT(SLOT__NAMESPACE, _), name)
 #define TYPE SLOT__TYPE
 #define Slot SLOT__NAMESPACE
-#define SLOT__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, ssize_t size, int align)
+#define SLOT__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
 static SLOT__ALLOC_PROTOTYPE(pfx(_default_allocator));
 
 
@@ -51,18 +50,18 @@ int pfx(_grow)(Slot *s, int new_capacity) {
 
     SLOT__ALLOC_PROTOTYPE(*allocator) = s->allocator != NULL ? s->allocator : pfx(_default_allocator);
 
-    int* new_userid_to_itemid = (int*) allocator(s->allocator_user_data, s->userid_to_itemid, (ssize_t)new_capacity * (ssize_t)sizeof(int), alignof(int));
-    int* new_itemid_to_userid = (int*) allocator(s->allocator_user_data, s->itemid_to_userid, (ssize_t)new_capacity * (ssize_t)sizeof(int), alignof(int));
-    TYPE* new_items           = (TYPE*)allocator(s->allocator_user_data, s->items           , (ssize_t)new_capacity * (ssize_t)sizeof(TYPE), alignof(TYPE));
+    int* new_userid_to_itemid = (int*) allocator(s->userid_to_itemid, (size_t)new_capacity * sizeof(int), alignof(int)  , s->allocator_user_data);
+    int* new_itemid_to_userid = (int*) allocator(s->itemid_to_userid, (size_t)new_capacity * sizeof(int), alignof(int)  , s->allocator_user_data);
+    TYPE* new_items           = (TYPE*)allocator(s->items           , (size_t)new_capacity * sizeof(TYPE), alignof(TYPE), s->allocator_user_data);
 
     if (new_userid_to_itemid == NULL
         || new_itemid_to_userid == NULL
         || new_items == NULL
     ) {
         if (s->items == NULL) { // In case it's first time allocation free on failure.
-            if (new_userid_to_itemid != NULL) { allocator(s->allocator_user_data, new_userid_to_itemid, 0, 0); }
-            if (new_itemid_to_userid != NULL) { allocator(s->allocator_user_data, new_itemid_to_userid, 0, 0); }
-            if (new_items            != NULL) { allocator(s->allocator_user_data, new_items           , 0, 0); }
+            if (new_userid_to_itemid != NULL) { allocator(new_userid_to_itemid, 0, 0, s->allocator_user_data); }
+            if (new_itemid_to_userid != NULL) { allocator(new_itemid_to_userid, 0, 0, s->allocator_user_data); }
+            if (new_items            != NULL) { allocator(new_items           , 0, 0, s->allocator_user_data); }
         }
         return -1;
     }
@@ -160,23 +159,24 @@ void pfx(print_debug)(const Slot *s) {
 }
 
 
-static SLOT__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
-    (void)align; (void)user_data; // Unused: malloc guarantees alignment.
+size_t pfx(report_memory)(const Slot *s) {
+    size_t count = sizeof(Slot);
+    count += (size_t)s->capacity * sizeof(*s->userid_to_itemid);
+    count += (size_t)s->capacity * sizeof(*s->itemid_to_userid);
+    count += (size_t)s->capacity * sizeof(*s->items);
+    return count;
+}
 
+
+static SLOT__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
     // New allocation: ptr == NULL && size > 0
     // Reallocation:   ptr != NULL && size > 0
     // Free:           ptr != NULL && size == 0
-
+    (void)align; (void)user_data; // Unused: malloc guarantees alignment.
     void* result = NULL;
-    if (size == 0) {
-        free(ptr);
-    } else {
-        if (ptr == NULL) {
-            result = malloc((size_t)size);
-        } else {
-            result = realloc(ptr, (size_t)size);
-        }
-    }
+    if      (size == 0)   { free(ptr);                   }
+    else if (ptr == NULL) { result = malloc(size);       }
+    else                  { result = realloc(ptr, size); }
     return result;
 }
 

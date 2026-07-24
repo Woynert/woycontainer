@@ -28,27 +28,15 @@
 #endif
 #define STRMAP__PFX(name) STRMAP__TOKCAT(STRMAP__TOKCAT(STRMAP__NAMESPACE, _), name)
 #define STRMAP__PRI(name) STRMAP__TOKCAT(STRMAP__TOKCAT(STRMAP__NAMESPACE, __), name)
-
-
 #if (defined(pub) | defined(TYPE) | defined(Strmap))
 #error "These macros should not be defined: pub, TYPE, Strmap"
 #endif
 
 
 typedef struct STRMAP__PRI(Pair) {
-    int key;
     STRMAP__TYPE value;
+    int key;
 } STRMAP__PRI(Pair);
-
-
-//#define DYNA__TYPE int
-//#define DYNA__NAMESPACE STRMAP__PRI(key_da)
-//#include "da.h"
-
-
-//#define DYNA__TYPE STRMAP__TYPE
-//#define DYNA__NAMESPACE STRMAP__PRI(value_da)
-//#include "da.h"
 
 
 #define DYNA__TYPE STRMAP__PRI(Pair)
@@ -57,17 +45,8 @@ typedef struct STRMAP__PRI(Pair) {
 
 
 typedef struct STRMAP__PRI(Bucket) {
-    /* Values and keys are separated collections so that
-       it's faster to iterate the keys individually. */
-    //STRMAP__PRI(key_da) keys;
-    //STRMAP__PRI(value_da) values;
     STRMAP__PRI(Pair_da) pairs;
 } STRMAP__PRI(Bucket);
-
-
-//#define ARRAY__TYPE STRMAP__PRI(Pair_da)
-//#define ARRAY__NAMESPACE STRMAP__PRI(Pair_dyar_ar)
-//#include "array.h"
 
 
 #define ARRAY__TYPE STRMAP__PRI(Bucket)
@@ -78,8 +57,9 @@ typedef struct STRMAP__PRI(Bucket) {
 #define pri STRMAP__PRI
 #define TYPE STRMAP__TYPE
 #define Strmap STRMAP__NAMESPACE
-
-#define STRMAP__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, size_t size, int align)
+#define STRMAP__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
+#define STRMAP__DEFAULT_SIZE_EXP 8
+#define STRMAP__REHASH_FACTOR 0.7
 
 
 typedef struct {
@@ -120,19 +100,22 @@ int pri(grow)(Strmap *m, int new_size) {
 }
 
 
-int pub(create_with_allocator)(Strmap *m, STRMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
+int pri(init)(Strmap *m, STRMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
     *m = (Strmap) { 0 };
-
     int err = strpool_create_with_allocator(&m->strpool, allocator, allocator_userdata);
-    if (err != 0) {
-        return -1;
-    }
-
+    if (err != 0) { return -1; }
     m->allocator = allocator;
     m->allocator_userdata = allocator_userdata;
     m->buckets = pri(Bucket_Array_create_with_allocator)(allocator, allocator_userdata);
+    return 0;
+}
 
-    return pri(grow)(m, 8); // DEFAULT CAPACITY.
+
+int pub(create_with_allocator)(Strmap *m, STRMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
+    *m = (Strmap) { 0 };
+    int err = pri(init)(m, allocator, allocator_userdata);
+    if (err != 0) { return -1; }
+    return pri(grow)(m, STRMAP__DEFAULT_SIZE_EXP); // DEFAULT CAPACITY.
 }
 
 
@@ -151,10 +134,10 @@ void pub(free)(Strmap *m) {
     *m = (Strmap) { 0 };
 }
 
-//#define FAST_MODULO (size_t)(hash & (uint64_t)(table->capacity - 1))
 
 #ifndef STRMAP__UTILS
 #define STRMAP__UTILS
+
 
 uint64_t strmap__hash(strmap__view view) {
     // https://nullprogram.com/blog/2025/01/19/
@@ -176,9 +159,8 @@ strpool__str strmap__view_to_strpool_str(strmap__view str) {
 
 bool strmap__view_equals(strmap__view str1, strmap__view str2) {
     if (str1.size != str2.size) { return false; }
-    return !str1.size || !memcmp(str1.data, str1.data, (size_t)str1.size);
-    // str1.size seems superfluous but it's necessary.
-    // See https://nullprogram.com/blog/2025/01/19/#strings
+    return !str1.size || !memcmp(str1.data, str2.data, (size_t)str1.size);
+    // !str1.size it's necessary see https://nullprogram.com/blog/2025/01/19/#strings
 }
 
 #endif // !STRMAP__UTILS
@@ -194,7 +176,7 @@ static inline pri(Bucket) *pri(hash_and_get_bucket)(Strmap *m, strmap__view key)
 
 void pri(rehash_if_needed)(Strmap *old_m) {
     float factor = (float)old_m->pair_count / (float)old_m->buckets.size;
-    if (factor < 0.75) {
+    if (factor < STRMAP__REHASH_FACTOR) {
         return;
     }
 
@@ -203,7 +185,7 @@ void pri(rehash_if_needed)(Strmap *old_m) {
     Strmap new_map;
     Strmap *new_m = &new_map;
 
-    int err = pub(create_with_allocator)(new_m, old_m->allocator, old_m->allocator_userdata);
+    int err = pri(init)(new_m, old_m->allocator, old_m->allocator_userdata);
     if (err == -1) {
         printfd("ERR: Couldn't rehash, no memory?");
         return;
@@ -253,12 +235,15 @@ void pri(rehash_if_needed)(Strmap *old_m) {
         pub(free)(new_m);
     }
 
+    printfd("DEBUG: Rehashed.");
     return;
 }
 
 
 /// @Returns error.
 int pub(set_pair)(Strmap *m, strmap__view key, STRMAP__TYPE value) {
+
+    pri(rehash_if_needed)(m);
 
     pri(Bucket) *bucket = pri(hash_and_get_bucket)(m, key);
 
@@ -290,8 +275,6 @@ int pub(set_pair)(Strmap *m, strmap__view key, STRMAP__TYPE value) {
         strpool_remove(&m->strpool, strpool_key_id);
         return -1;
     }
-
-    pri(rehash_if_needed)(m);
 
     return err;
 }
@@ -329,6 +312,8 @@ static int pub(remove)(Strmap *m, strmap__view key) {
 
             if (err1 != 0) { printfd("ERROR(%d) strpool. Couldn't delete.", err1); }
             if (err2 != 0) { printfd("ERROR(%d) pair_da. Couldn't delete.", err2); }
+
+            --m->pair_count;
             return 0;
         }
     }
@@ -347,6 +332,17 @@ static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, i
 }
 
 
+size_t pub(report_memory)(Strmap *m) {
+    size_t count = sizeof(Strmap);
+    count += (size_t)m->buckets.size * sizeof(pri(Bucket));
+    for (int i = 0; i < m->buckets.size; ++i) {
+        count += (size_t)m->buckets.items[i].pairs.size * sizeof(pri(Pair));
+    }
+    count += strpool_report_memory(&m->strpool);
+    return count;
+}
+
+
 #undef STRMAP__TYPE
 #undef STRMAP__TOKCAT_
 #undef STRMAP__TOKCAT
@@ -358,3 +354,4 @@ static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, i
 #undef TYPE
 #undef Strmap
 #undef STRMAP__ALLOC_PROTOTYPE
+#undef STRMAP__DEFAULT_SIZE_EXP

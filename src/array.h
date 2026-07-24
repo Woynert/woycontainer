@@ -36,7 +36,7 @@
 #define TYPE ARRAY__TYPE
 #define Array ARRAY__NAMESPACE
 
-#define ARRAY__ALLOC_PROTOTYPE(x) void* (x) (void* user_data, void* ptr, size_t size, int align)
+#define ARRAY__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
 
 typedef struct {
     int size;
@@ -77,7 +77,7 @@ static inline void pfx(destroy) (Array *a) {
     if (a->items != NULL) {
         ARRAY__ALLOC_PROTOTYPE(*allocator) = a->allocator != NULL ? a->allocator : pfx(_default_allocator);
         // Free.
-        allocator(a->allocator_userdata, a->items, 0, 0);
+        allocator(a->items, 0, 0, a->allocator_userdata);
     }
     *a = (Array) { 0 };
 }
@@ -92,7 +92,7 @@ static int pfx(resize) (Array *a, int new_size) {
     ARRAY__ALLOC_PROTOTYPE(*allocator) = a->allocator != NULL ? a->allocator : pfx(_default_allocator);
 
     TYPE *new_ptr = NULL;
-    new_ptr = allocator(a->allocator_userdata, a->items, sizeof(TYPE) * (size_t)new_size, alignof(TYPE));
+    new_ptr = allocator(a->items, sizeof(TYPE) * (size_t)new_size, alignof(TYPE), a->allocator_userdata);
     if (new_ptr == NULL) { return -1; }
 
     a->size = new_size;
