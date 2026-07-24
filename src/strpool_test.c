@@ -4,12 +4,11 @@
 #include "strpool.h"
 
 
-#define str strpool__str
-#define cstr_SL(sl_arg) ((str){.data=(sl_arg), .size=sizeof(sl_arg)-1})
-#define PRIstr ".*s"
-#define PRIstrarg(arg) ((arg).size),((arg).data)
+#define Str wstrview_t
+#define STRPOOL__CHUNK ((int)sizeof(strpool__Node))
 
-bool strview_is_valid(str mystr) {
+
+bool strview_is_valid(Str mystr) {
     return mystr.data != NULL;
 }
 
@@ -26,7 +25,7 @@ int strpool__get_free_node_mount(strpool *p) {
 }
 
 void strpool_print_debug(strpool *p) {
-    // TODO: 2. Print pairs of index->str.
+    // TODO: 2. Print pairs of index->Str.
     // TODO: 3. Print binary representation of the whole thing.
     // TODO: 1. Print chain of free nodes.
 
@@ -46,9 +45,9 @@ void strpool_print_debug(strpool *p) {
     printf(ANSI_GRE"Printing pairs (unordered)\n"ANSI_RESET);
     for (int i = 0; i < p->views.count; ++i) {
         int userid = p->views.itemid_to_userid[i];
-        str mystr = strpool_get(p, userid);
-        printf("userid %d itemid %d item (offset %d size %d (%d chunks)) {%"PRIstr"}\n",
-                userid, i, p->views.items[i].offset, p->views.items[i].size, strpool__div_ceil(p->views.items[i].size, STRPOOL_CHUNK), PRIstrarg(mystr));
+        Str mystr = strpool_get(p, userid);
+        printf("userid %d itemid %d item (offset %d size %d (%d chunks)) {%"PRIwstr"}\n",
+                userid, i, p->views.items[i].offset, p->views.items[i].size, strpool__div_ceil(p->views.items[i].size, STRPOOL__CHUNK), PRIwstrarg(mystr));
     }
     printf("\n");
 }
@@ -59,76 +58,76 @@ TEST test_general(void) {
     ASSERT(err == 0);
     strpool_print_debug(&pool);
 
-    printvalnum(strpool__div_ceil(0, STRPOOL_CHUNK));
+    printvalnum(strpool__div_ceil(0, STRPOOL__CHUNK));
 
     int view_id;
-    str result;
+    Str result;
 
-    view_id = strpool_append(&pool, cstr_SL(""));
+    view_id = strpool_append(&pool, wcstr_SL(""));
     ASSERT_INT_GTE(view_id, 0);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     strpool_print_debug(&pool);
     int str_id_empty1 = view_id;
 
-    view_id = strpool_append(&pool, cstr_SL("Hello"));
+    view_id = strpool_append(&pool, wcstr_SL("Hello"));
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     strpool_print_debug(&pool);
     int str_id_hello = view_id;
 
-    view_id = strpool_append(&pool, cstr_SL(""));
+    view_id = strpool_append(&pool, wcstr_SL(""));
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     strpool_print_debug(&pool);
     int str_id_empty2 = view_id;
 
-    view_id = strpool_append(&pool, cstr_SL("1234567890"));
+    view_id = strpool_append(&pool, wcstr_SL("1234567890"));
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     strpool_print_debug(&pool);
     int str_id_numbers = view_id;
 
-    view_id = strpool_append(&pool, cstr_SL("lkdafjdls;jfdaljdofvjdsofjal dkjflajd lfjladsjvfoajadasofjcvodasjfcojdaofjdaos fajodisfj aopdsuf9p8uf93q4u9cfjidjlfjadljfdsjf98aua4ajf4lkj2fcljdsoafu48u2fodjalf;j84279158jfkjdaskfjd mjf9 0sudf90ja odjf kldasfj dlsjaf 98quf qoljf ldjfqp8eq9jf eljf aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "));
+    view_id = strpool_append(&pool, wcstr_SL("lkdafjdls;jfdaljdofvjdsofjal dkjflajd lfjladsjvfoajadasofjcvodasjfcojdaofjdaos fajodisfj aopdsuf9p8uf93q4u9cfjidjlfjadljfdsjf98aua4ajf4lkj2fcljdsoafu48u2fodjalf;j84279158jfkjdaskfjd mjf9 0sudf90ja odjf kldasfj dlsjaf 98quf qoljf ldjfqp8eq9jf eljf aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "));
     strpool_print_debug(&pool);
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     strpool_print_debug(&pool);
     int str_id_longtext = view_id;
 
     /*
-    view_id = strpool_append(&pool, cstr_SL(""));
+    view_id = strpool_append(&pool, wcstr_SL(""));
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(*result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(*result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(*result));
     strpool_print_debug(&pool);
     */
 
-    view_id = strpool_append(&pool, cstr_SL("Crazy? I was crazy once."));
+    view_id = strpool_append(&pool, wcstr_SL("Crazy? I was crazy once."));
     strpool_print_debug(&pool);
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     strpool_print_debug(&pool);
     int str_id_crazy = view_id;
 
-    view_id = strpool_append(&pool, cstr_SL("They locked me in a room."));
+    view_id = strpool_append(&pool, wcstr_SL("They locked me in a room."));
     strpool_print_debug(&pool);
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     strpool_print_debug(&pool);
     int str_id_locked = view_id;
 
@@ -144,38 +143,38 @@ TEST test_general(void) {
 
 
     /*
-    view_id = strpool_append(&strpool, cstr_SL(""));
+    view_id = strpool_append(&strpool, wcstr_SL(""));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
 
-    view_id = strpool_append(&strpool, cstr_SL("Hello"));
+    view_id = strpool_append(&strpool, wcstr_SL("Hello"));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     int str_id_hello = view_id;
 
-    view_id = strpool_append(&strpool, cstr_SL(""));
+    view_id = strpool_append(&strpool, wcstr_SL(""));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     int str_id_empty = view_id;
 
-    view_id = strpool_append(&strpool, cstr_SL("This is me"));
+    view_id = strpool_append(&strpool, wcstr_SL("This is me"));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     int str_id_thisme = view_id;
 
-    view_id = strpool_append(&strpool, cstr_SL("lkdafjdls;jfdaljdofvjdsofjal dkjflajd lfjladsjvfoajadasofjcvodasjfcojdaofjdaos fajodisfj aopdsuf9p8uf93q4u9cfjidjlfjadljfdsjf98aua4ajf4lkj2fcljdsoafu48u2fodjalf;j84279158jfkjdaskfjd mjf9 0sudf90ja odjf kldasfj dlsjaf 98quf qoljf ldjfqp8eq9jf eljf aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "));
+    view_id = strpool_append(&strpool, wcstr_SL("lkdafjdls;jfdaljdofvjdsofjal dkjflajd lfjladsjvfoajadasofjcvodasjfcojdaofjdaos fajodisfj aopdsuf9p8uf93q4u9cfjidjlfjadljfdsjf98aua4ajf4lkj2fcljdsoafu48u2fodjalf;j84279158jfkjdaskfjd mjf9 0sudf90ja odjf kldasfj dlsjaf 98quf qoljf ldjfqp8eq9jf eljf aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     int str_id_longtext = view_id;
 
     strpool_print_debug(&strpool);
@@ -227,11 +226,11 @@ TEST test_general(void) {
 
     // Adding.
 
-    view_id = strpool_append(&pool, cstr_SL("Hello"));
+    view_id = strpool_append(&pool, wcstr_SL("Hello"));
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIwstr"]", view_id, PRIwstrarg(result));
     strpool_print_debug(&pool);
     str_id_hello = view_id;
 

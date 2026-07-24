@@ -1,6 +1,7 @@
 /*
    String pool data structure.
 
+
    FEATURES:
    * Pro: Stable user facing ids.
    * Pro: Unlimited growth.
@@ -8,24 +9,37 @@
    * Pro: Fast deletion.
    * Neutral: Finds space using a "free list". (Red-Black tree would be better).
    * Con: Previously deleted ids will be reutilized often.
+
+   USAGE:
+
+   You can bring your own string view type. It must have the following
+   interface or equivalent:
+
+        typedef struct { char *data; int size; } MyStr;
+        #define STRPOOL_STR MyStr
+        #include "strpool.h"
+
+    If not defined by default it will use "wstrview.h".
+
 */
 
 #ifndef STRPOOL_GENERAL
 #define STRPOOL_GENERAL
+
 
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 
+#ifndef STRPOOL_STR
+#include "wstrview.h"
+#define STRPOOL_STR wstrview_t
+#endif
+
+
 #define STRPOOL__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
 static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator);
-
-
-typedef struct strpool__str {
-    const char *data;
-    int size;
-} strpool__str;
 
 
 typedef struct strpool__view {
@@ -45,7 +59,7 @@ typedef struct strpool__Node {
 } strpool__Node;
 
 
-#define STRPOOL_CHUNK ((int)sizeof(strpool__Node))
+#define STRPOOL__CHUNK ((int)sizeof(strpool__Node))
 
 
 typedef struct strpool{
@@ -68,8 +82,8 @@ typedef struct strpool{
 int          strpool_create(strpool *p);
 int          strpool_create_with_allocator(strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data);
 void         strpool_destroy(strpool *p);
-int          strpool_append(strpool *p, strpool__str view);
-strpool__str strpool_get(const strpool *p, int view_id);
+int          strpool_append(strpool *p, STRPOOL_STR view);
+STRPOOL_STR  strpool_get(const strpool *p, int view_id);
 int          strpool_remove(strpool *p, int view_id);
 size_t       strpool_report_memory(const strpool *p);
 
@@ -206,7 +220,7 @@ int strpool__grow(strpool *p, int min_size) {
     if (new_capacity < p->capacity) { return -1; }
 
     STRPOOL__ALLOC_PROTOTYPE(*allocator) = p->allocator != NULL ? p->allocator : strpool__default_allocator;
-    strpool__Node *new_nodes = (strpool__Node *)allocator(p->nodes, (size_t)new_capacity * STRPOOL_CHUNK, STRPOOL_CHUNK, p->allocator_user_data);
+    strpool__Node *new_nodes = (strpool__Node *)allocator(p->nodes, (size_t)new_capacity * STRPOOL__CHUNK, STRPOOL__CHUNK, p->allocator_user_data);
     if (new_nodes == NULL) { return -1; }
     p->nodes = new_nodes;
 
@@ -236,7 +250,7 @@ int strpool__find_space(const strpool *p, int space, int *out_i_prev_node) {
     int i_node = p->i_first_free_node; 
     strpool__Node *node = strpool__get_node(p, i_node);
     while (node != NULL) {
-        if ((node->free_chunks * STRPOOL_CHUNK) >= space) {
+        if ((node->free_chunks * STRPOOL__CHUNK) >= space) {
             *out_i_prev_node = i_prev_node;
             return i_node;
         } else {
@@ -254,7 +268,7 @@ int strpool__find_space(const strpool *p, int space, int *out_i_prev_node) {
 
 /// @returns index or -1.
 /// @reval   -1 Error.
-int strpool_append(strpool *p, strpool__str view) {
+int strpool_append(strpool *p, STRPOOL_STR view) {
     int i_node_prev = -1;
     int i_node = -1;
 
@@ -280,7 +294,7 @@ int strpool_append(strpool *p, strpool__str view) {
     strpool__Node *node = &p->nodes[i_node];
     char *writing_area = (char *)node;
 
-    int consumed_chunks = strpool__div_ceil(view.size, STRPOOL_CHUNK);
+    int consumed_chunks = strpool__div_ceil(view.size, STRPOOL__CHUNK);
     int remaining_chunks = node->free_chunks - consumed_chunks;
 
     // Unlink or remove used node.
@@ -315,7 +329,7 @@ int strpool_remove(strpool *p, int view_id) {
             return -1;
         }
         i_curr = view->offset;
-        view_chunks = strpool__div_ceil(view->size, STRPOOL_CHUNK);
+        view_chunks = strpool__div_ceil(view->size, STRPOOL__CHUNK);
     }
     strpool__view_Slot_pop(&p->views, view_id);
     if (view_chunks == 0) { return 0; } // Empty string.
@@ -325,12 +339,12 @@ int strpool_remove(strpool *p, int view_id) {
 
 
 /// @Returns view or INVALID_VIEW If not found. An invalid view is .data == NULL.
-strpool__str strpool_get(const strpool *p, int view_id) {
+STRPOOL_STR strpool_get(const strpool *p, int view_id) {
     strpool__view *view = strpool__view_Slot_get(&p->views, view_id);
     if (view == NULL) {
-        return (strpool__str) { .data = NULL, .size = 0, };
+        return (STRPOOL_STR) { .data = NULL, .size = 0, };
     }
-    return (strpool__str) { .data = (char *)((strpool__Node *)p->nodes + view->offset), .size = view->size, };
+    return (STRPOOL_STR) { .data = (char *)((strpool__Node *)p->nodes + view->offset), .size = view->size, };
 }
 
 
@@ -355,4 +369,7 @@ static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator) {
 }
 
 
+#undef STRPOOL_STR
+#undef STRPOOL__ALLOC_PROTOTYPE
+#undef STRPOOL__CHUNK
 #endif // !STRPOOL_GENERAL

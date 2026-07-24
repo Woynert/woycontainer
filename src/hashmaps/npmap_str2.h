@@ -61,14 +61,7 @@ static inline bool pri(node_is_empty) (const Map *m, const pri(Node) *node) { re
 static MAP__ALLOC_PROTOTYPE(pri(default_allocator));
 
 
-bool pri(str_equals)(strpool__str str1, strpool__str str2) {
-    if (str1.size != str2.size) { return false; }
-    return !str1.size || !memcmp(str1.data, str2.data, (size_t)str1.size);
-    // !str1.size it's necessary see https://nullprogram.com/blog/2025/01/19/#strings
-}
-
-
-uint64_t pri(hash_str64)(strpool__str s) {
+uint64_t pri(hash_str64)(wstrview_t s) {
     uint64_t h = 0x100;
     for (ptrdiff_t i = 0; i < s.size; i++) {
         h ^= s.data[i] & 255;
@@ -87,7 +80,7 @@ int32_t pri(ht_lookup)(uint64_t hash, int exp, int32_t idx) {
 */
 
 
-pri(Node) **pri(lookup)(Map *m, strpool__str key, int *out_idx, bool trying_to_insert) {
+pri(Node) **pri(lookup)(Map *m, wstrview_t key, int *out_idx, bool trying_to_insert) {
     pri(Node) **dest = NULL;
     uint64_t h = pri(hash_str64)(key);
 
@@ -121,9 +114,9 @@ pri(Node) **pri(lookup)(Map *m, strpool__str key, int *out_idx, bool trying_to_i
             // When searching, skip over it.
         }
         else { // Compare keys.
-            strpool__str stored_key = strpool_get(&m->strpool, node->key);
+            wstrview_t stored_key = strpool_get(&m->strpool, node->key);
             if (stored_key.data == NULL) { printfd("Error: Invalid key should never happen."); }
-            if (pri(str_equals)(key, stored_key)) { // Found it.
+            if (wstrview_equals(key, stored_key)) { // Found it.
                 if (out_idx != NULL) { *out_idx = i; }
                 return &m->hashmap[i];
             }
@@ -134,7 +127,7 @@ pri(Node) **pri(lookup)(Map *m, strpool__str key, int *out_idx, bool trying_to_i
 int pri(grow)(Map *old_m, int new_size_exp);
 
 /// @Returns error.
-int pub(upsert)(Map *m, strpool__str key, MAP__TYPE value) {
+int pub(upsert)(Map *m, wstrview_t key, MAP__TYPE value) {
     float factor = (float)m->count / (float)(1 << m->size_exp);
     if (factor > MAP__REHASH_FACTOR) {
         pri(grow)(m, m->size_exp +1);  // Regrow & rehash if pushing the optimal factor.
@@ -168,14 +161,14 @@ int pub(upsert)(Map *m, strpool__str key, MAP__TYPE value) {
 }
 
 /// @Returns pointer to stored value or NULL.
-MAP__TYPE *pub(get)(Map *m, strpool__str key) {
+MAP__TYPE *pub(get)(Map *m, wstrview_t key) {
     pri(Node) **node_slot = pri(lookup)(m, key, NULL, false);
     if (node_slot == NULL || *node_slot == NULL) { return NULL; }
     return &(*node_slot)->value;
 }
 
 /// @Returns error.
-int pub(remove)(Map *m, strpool__str key) {
+int pub(remove)(Map *m, wstrview_t key) {
     pri(Node) **node_slot = pri(lookup)(m, key, NULL, false);
     if (node_slot == NULL || *node_slot == NULL) { return -1; }
     strpool_remove(&m->strpool, (*node_slot)->key);
@@ -235,7 +228,7 @@ void pri(rehash)(Map *old_m, Map *new_m) {
         pri(Node) *node = old_m->hashmap[i];
         if (pri(node_is_empty)(old_m, node)) { continue; }
 
-        strpool__str stored_key = strpool_get(&old_m->strpool, node->key);
+        wstrview_t stored_key = strpool_get(&old_m->strpool, node->key);
         if (stored_key.data == NULL) { printfd("ERR: Couldn't find stored key."); continue; }
 
         // Insert.

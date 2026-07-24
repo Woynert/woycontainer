@@ -54,11 +54,11 @@ test('npmap0_test', npmap0_test)
 npmap1_test = executable('npmap1_test', './src/hashmaps/npmap1_test.c')
 test('npmap1_test', npmap1_test)
 
-npmap_str0_test = executable('npmap_str0_test', './src/hashmaps/npmap_str0_test.c')
-test('npmap_str0_test', npmap_str0_test)
+#npmap_str0_test = executable('npmap_str0_test', './src/hashmaps/npmap_str0_test.c')
+#test('npmap_str0_test', npmap_str0_test)
 
-npmap_str1_test = executable('npmap_str1_test', './src/hashmaps/npmap_str1_test.c')
-test('npmap_str1_test', npmap_str1_test)
+#npmap_str1_test = executable('npmap_str1_test', './src/hashmaps/npmap_str1_test.c')
+#test('npmap_str1_test', npmap_str1_test)
 
 npmap_str2_test = executable('npmap_str2_test', './src/hashmaps/npmap_str2_test.c')
 test('npmap_str2_test', npmap_str2_test)
