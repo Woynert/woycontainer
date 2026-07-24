@@ -73,7 +73,7 @@ typedef struct {
 } Strmap;
 
 
-int pub(upsert)(Strmap *m, wstrview_t key, STRMAP__TYPE value);
+int pub(upsert)(Strmap *m, strview_t key, STRMAP__TYPE value);
 
 
 static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, int strpool_key, STRMAP__TYPE value);
@@ -132,7 +132,7 @@ void pub(free)(Strmap *m) {
 
 #ifndef STRMAP__UTILS
 #define STRMAP__UTILS
-uint64_t strmap__hash(wstrview_t view) {
+uint64_t strmap__hash(strview_t view) {
     uint64_t h = 0x100;
     for (ptrdiff_t i = 0; i < view.size; i++) {
         h ^= view.data[i] & 255;
@@ -144,7 +144,7 @@ uint64_t strmap__hash(wstrview_t view) {
 #endif
 
 
-static inline pri(Bucket) *pri(hash_and_get_bucket)(Strmap *m, wstrview_t key) {
+static inline pri(Bucket) *pri(hash_and_get_bucket)(Strmap *m, strview_t key) {
     uint64_t hash = strmap__hash(key);
     int bucket_id = (int)(hash & (uint64_t)(m->buckets.size - 1));
     return &m->buckets.items[bucket_id];
@@ -182,7 +182,7 @@ void pri(rehash_if_needed)(Strmap *old_m) {
             // Insert every single pair.
 
             pri(Pair) *pair = &bucket->pairs.items[k];
-            wstrview_t key = strpool_get(&old_m->strpool, pair->key);
+            strview_t key = strpool_get(&old_m->strpool, pair->key);
             pri(Bucket) *new_bucket = pri(hash_and_get_bucket)(new_m, key);
 
             err = pri(set_pair_with_final_key)(new_m, new_bucket, pair->key, pair->value);
@@ -218,7 +218,7 @@ void pri(rehash_if_needed)(Strmap *old_m) {
 
 
 /// @Returns error.
-int pub(upsert)(Strmap *m, wstrview_t key, STRMAP__TYPE value) {
+int pub(upsert)(Strmap *m, strview_t key, STRMAP__TYPE value) {
 
     pri(rehash_if_needed)(m);
 
@@ -228,7 +228,7 @@ int pub(upsert)(Strmap *m, wstrview_t key, STRMAP__TYPE value) {
 
     for (int i = 0; i < bucket->pairs.size; ++i) {
         int str_internal_storage_key = bucket->pairs.items[i].key;
-        wstrview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
+        strview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
 
         if (wstrview_equals(stored_key, key))
         {
@@ -257,12 +257,12 @@ int pub(upsert)(Strmap *m, wstrview_t key, STRMAP__TYPE value) {
 }
 
 
-static STRMAP__TYPE *pub(get)(Strmap *m, wstrview_t key) {
+static STRMAP__TYPE *pub(get)(Strmap *m, strview_t key) {
     pri(Bucket) *bucket = pri(hash_and_get_bucket)(m, key);
 
     for (int i = 0; i < bucket->pairs.size; ++i) {
         int str_internal_storage_key = bucket->pairs.items[i].key;
-        wstrview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
+        strview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
 
         if (wstrview_equals(stored_key, key))
         {
@@ -274,12 +274,12 @@ static STRMAP__TYPE *pub(get)(Strmap *m, wstrview_t key) {
 
 
 /// @Returns Error.
-static int pub(remove)(Strmap *m, wstrview_t key) {
+static int pub(remove)(Strmap *m, strview_t key) {
     pri(Bucket) *bucket = pri(hash_and_get_bucket)(m, key);
 
     for (int i = 0; i < bucket->pairs.size; ++i) {
         int str_internal_storage_key = bucket->pairs.items[i].key;
-        wstrview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
+        strview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
 
         if (wstrview_equals(stored_key, key))
         {

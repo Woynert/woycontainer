@@ -34,7 +34,7 @@
 
 #ifndef STRPOOL_STR
 #include "wstrview.h"
-#define STRPOOL_STR wstrview_t
+#define STRPOOL_STR strview_t
 #endif
 
 

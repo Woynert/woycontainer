@@ -24,7 +24,7 @@ typedef struct {
 
 
 #define Map MAP__NAMESPACE
-#define Str wstrview_t
+#define Str strview_t
 #define makefruit(name) ((Fruit) { name })
 
 
@@ -35,14 +35,14 @@ void print_pairs(const Map *m) {
     for (int i = 0; i < (1 << m->size_exp); ++i) {
         pri(Node) * node = m->hashmap[i];
         if (pri(node_is_empty)(m, node)) { continue; }
-        wstrview_t stored_key = strpool_get(&m->strpool, node->key);
-        printfd("(i %-4d)(strkey %-4d): %"PRIwstr" = %s", i, node->key, PRIwstrarg(stored_key), node->value.name);
+        strview_t stored_key = strpool_get(&m->strpool, node->key);
+        printfd("(i %-4d)(strkey %-4d): %"PRIstr" = %s", i, node->key, PRIstrarg(stored_key), node->value.name);
     }
 }
 
 
 bool items_are_equal(Fruit a, Fruit b) {
-    bool res = wstrview_equals(wcstr(a.name), wcstr(b.name));
+    bool res = wstrview_equals(cstr(a.name), cstr(b.name));
     /*printfd("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
     return res;
 }
@@ -98,13 +98,13 @@ bool should_find_these(const Map *m, MAP__TYPE *p_items, const int item_amount) 
 
 
 TEST test_str(void) {
-    ASSERT_FALSE(wstrview_equals(wcstr_SL("banana"), wcstr_SL("BANANA")));
-    ASSERT_FALSE(wstrview_equals(wcstr_SL("banana"), wcstr_SL("banana\0"))); 
-    ASSERT_FALSE(wstrview_equals(wcstr_SL("banana\0"), wcstr("banana\0")));
-    ASSERT_TRUE(wstrview_equals(wcstr("banana"), wcstr("banana\0\0\0\0")));
-    ASSERT_FALSE(wstrview_equals(wcstr_SL("banana"), wcstr_SL("banana\0\0\0\0")));
-    ASSERT_TRUE(wstrview_equals(wcstr("banana"), wcstr("banana\0")));
-    // ↑↑↑ True because wcstr calls strlen. But wcstr_SL calls sizeof.
+    ASSERT_FALSE(wstrview_equals(cstr_SL("banana"), cstr_SL("BANANA")));
+    ASSERT_FALSE(wstrview_equals(cstr_SL("banana"), cstr_SL("banana\0"))); 
+    ASSERT_FALSE(wstrview_equals(cstr_SL("banana\0"), cstr("banana\0")));
+    ASSERT_TRUE(wstrview_equals(cstr("banana"), cstr("banana\0\0\0\0")));
+    ASSERT_FALSE(wstrview_equals(cstr_SL("banana"), cstr_SL("banana\0\0\0\0")));
+    ASSERT_TRUE(wstrview_equals(cstr("banana"), cstr("banana\0")));
+    // ↑↑↑ True because cstr calls strlen. But cstr_SL calls sizeof.
     TEST_PASS;
 }
 
@@ -122,14 +122,14 @@ TEST test_general(void) {
     Fruit fruit;
     Fruit *result;
 
-    key = wcstr_SL("APPLE");
+    key = cstr_SL("APPLE");
     fruit = (Fruit) { "Appless" };
     err = pub(upsert)(m, key, fruit);
     ASSERT_INT(err, 0);
     print_pairs(m);
-    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(wcstr(result->name), wcstr(fruit.name)));
+    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(cstr(result->name), cstr(fruit.name)));
     ASSERT_INT(m->count, 1);
-    /*ASSERT(wstrview_equals(wcstr(m->items[0].value.name), wcstr(fruit.name)));*/
+    /*ASSERT(wstrview_equals(cstr(m->items[0].value.name), cstr(fruit.name)));*/
     /* ↑↑↑ Test internal implementation to make sure the FIRST pair
            is filled. Note it is NOT a feature of this map to be able
            to iterate through the items. */
@@ -139,12 +139,12 @@ TEST test_general(void) {
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
-    key = wcstr_SL("APPLE");
+    key = cstr_SL("APPLE");
     fruit = (Fruit) { "Apple" };
     err = pub(upsert)(m, key, fruit);
     ASSERT_INT(err, 0);
     print_pairs(m);
-    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(wcstr(result->name), wcstr(fruit.name)));
+    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(cstr(result->name), cstr(fruit.name)));
     ASSERT_INT(m->count, 1);
     Str key_apple = key;
     {
@@ -152,23 +152,23 @@ TEST test_general(void) {
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
-    key = wcstr_SL("BANANA");
+    key = cstr_SL("BANANA");
     fruit = (Fruit) { "Banana" };
     err = pub(upsert)(m, key, fruit);
     ASSERT_INT(err, 0);
     print_pairs(m);
-    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(wcstr(result->name), wcstr(fruit.name)));
+    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(cstr(result->name), cstr(fruit.name)));
     {
         Fruit to_find[] = { makefruit("Apple"), makefruit("Banana") };
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
-    key = wcstr_SL("PEAR");
+    key = cstr_SL("PEAR");
     fruit = (Fruit) { "Pear" };
     err = pub(upsert)(m, key, fruit);
     ASSERT_INT(err, 0);
     print_pairs(m);
-    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(wcstr(result->name), wcstr(fruit.name)));
+    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(cstr(result->name), cstr(fruit.name)));
     Str key_pear = key;
     {
         Fruit to_find[] = { makefruit("Apple"), makefruit("Banana"), makefruit("Pear") };
@@ -202,12 +202,12 @@ TEST test_general(void) {
 
     // Insert now that there is space available.
 
-    key = wcstr_SL("PINEAPPLE");
+    key = cstr_SL("PINEAPPLE");
     fruit = (Fruit) { "Pineapple" };
     err = pub(upsert)(m, key, fruit);
     ASSERT_INT(err, 0);
     print_pairs(m);
-    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(wcstr(result->name), wcstr(fruit.name)));
+    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(cstr(result->name), cstr(fruit.name)));
     {
         Fruit to_find[] = { makefruit("Banana"), makefruit("Pineapple") };
         ASSERT(should_find_these(m, to_find, countof(to_find)));
@@ -215,18 +215,18 @@ TEST test_general(void) {
 
     printfd("\n---->>> Reinserting APPLE.");
 
-    key = wcstr_SL("APPLE");
+    key = cstr_SL("APPLE");
     fruit = (Fruit) { "Apple" };
     err = pub(upsert)(m, key, fruit);
     ASSERT_INT(err, 0);
     print_pairs(m);
-    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(wcstr(result->name), wcstr(fruit.name)));
+    result = pub(get)(m, key); ASSERT(result != NULL); ASSERT(wstrview_equals(cstr(result->name), cstr(fruit.name)));
     {
         Fruit to_find[] = { makefruit("Banana"), makefruit("Pineapple"), makefruit("Apple") };
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
-    key = wcstr_SL("MANGO");
+    key = cstr_SL("MANGO");
     fruit = (Fruit) { "Mango" };
     err = pub(upsert)(m, key, fruit);
     ASSERT_INT(err, 0);
@@ -245,7 +245,7 @@ TEST test_general(void) {
         fruit = (Fruit) { 0 };
         sprintf(fruit.name, "fruit%d", i);
         sprintf(key_str, "FRUIT%d", i);
-        err = pub(upsert)(m, wcstr(key_str), fruit);
+        err = pub(upsert)(m, cstr(key_str), fruit);
         ASSERT_INT(err, 0);
     }
 
@@ -257,12 +257,12 @@ TEST test_general(void) {
     for (int i = 0; i < (1 << m->size_exp); ++i) {
         pri(Node) * node = m->hashmap[i];
         if (node == NULL) { continue; }
-        wstrview_t stored_key = strpool_get(&m->strpool, node->key);
+        strview_t stored_key = strpool_get(&m->strpool, node->key);
         err = pub(remove)(m, stored_key);
         if (err != 0) {
-            printfd(ANSI_RED"Failed to remove: %-4d: %"PRIwstr" = %s", node->key, PRIwstrarg(stored_key), node->value.name);
+            printfd(ANSI_RED"Failed to remove: %-4d: %"PRIstr" = %s", node->key, PRIstrarg(stored_key), node->value.name);
         } else {
-            printfd(ANSI_GRE"Removed: %-4d: %"PRIwstr" = %s", node->key, PRIwstrarg(stored_key), node->value.name);
+            printfd(ANSI_GRE"Removed: %-4d: %"PRIstr" = %s", node->key, PRIstrarg(stored_key), node->value.name);
         }
         ASSERT_INT(err, 0);
     }

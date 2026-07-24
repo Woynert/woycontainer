@@ -20,7 +20,7 @@ typedef struct {
 #include "../strmap.h"
 
 
-#define Str wstrview_t
+#define Str strview_t
 #define makefruit(name) ((Fruit) { name })
 #define EXP 19
 
@@ -52,7 +52,7 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
             Fruit fruit = (Fruit) { 0 };                                                    \
             sprintf(fruit.name, "fruit%d", i);                                              \
             sprintf(key_str, "FRUIT%d", i);                                                 \
-            err = map_upsert(&mymap, wcstr(key_str), fruit);                                \
+            err = map_upsert(&mymap, cstr(key_str), fruit);                                \
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
@@ -67,9 +67,9 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
             Fruit fruit = (Fruit) { 0 };                                                    \
             sprintf(fruit.name, "fruit%d", i);                                              \
             sprintf(key_str, "FRUIT%d", i);                                                 \
-            Fruit *result = map_get(&mymap, wcstr(key_str));                                \
+            Fruit *result = map_get(&mymap, cstr(key_str));                                \
             ASSERT(result != NULL);                                                         \
-            ASSERT(wstrview_equals(wcstr(fruit.name), wcstr(result->name)));                \
+            ASSERT(wstrview_equals(cstr(fruit.name), cstr(result->name)));                \
         }                                                                                   \
     }                                                                                       \
     printfd(COLOR"lookup: %f secs.", (double)(get_system_ms() - start)/(double)1000);       \
@@ -81,7 +81,7 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
             Fruit fruit = (Fruit) { 0 };                                                    \
             sprintf(fruit.name, "fruit%d", i);                                              \
             sprintf(key_str, "FRUIT%d", i);                                                 \
-            err = map_remove(&mymap, wcstr(key_str));                                       \
+            err = map_remove(&mymap, cstr(key_str));                                       \
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
@@ -96,7 +96,7 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
             Fruit fruit = (Fruit) { 0 };                                                    \
             sprintf(fruit.name, "fruit%d", i);                                              \
             sprintf(key_str, "FRUIT%d", i);                                                 \
-            err = map_upsert(&mymap, wcstr(key_str), fruit);                                \
+            err = map_upsert(&mymap, cstr(key_str), fruit);                                \
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
