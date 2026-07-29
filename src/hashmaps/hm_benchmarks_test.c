@@ -52,7 +52,7 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
             Fruit fruit = (Fruit) { 0 };                                                    \
             sprintf(fruit.name, "fruit%d", i);                                              \
             sprintf(key_str, "FRUIT%d", i);                                                 \
-            err = map_upsert(&mymap, cstr(key_str), fruit);                                \
+            err = map_upsert(&mymap, wcstr(key_str), fruit);                                \
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
@@ -67,9 +67,9 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
             Fruit fruit = (Fruit) { 0 };                                                    \
             sprintf(fruit.name, "fruit%d", i);                                              \
             sprintf(key_str, "FRUIT%d", i);                                                 \
-            Fruit *result = map_get(&mymap, cstr(key_str));                                \
+            Fruit *result = map_get(&mymap, wcstr(key_str));                                \
             ASSERT(result != NULL);                                                         \
-            ASSERT(wstrview_equals(cstr(fruit.name), cstr(result->name)));                \
+            ASSERT(wstrview_equals(wcstr(fruit.name), wcstr(result->name)));                \
         }                                                                                   \
     }                                                                                       \
     printfd(COLOR"lookup: %f secs.", (double)(get_system_ms() - start)/(double)1000);       \
@@ -81,7 +81,7 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
             Fruit fruit = (Fruit) { 0 };                                                    \
             sprintf(fruit.name, "fruit%d", i);                                              \
             sprintf(key_str, "FRUIT%d", i);                                                 \
-            err = map_remove(&mymap, cstr(key_str));                                       \
+            err = map_remove(&mymap, wcstr(key_str));                                       \
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
@@ -96,7 +96,7 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
             Fruit fruit = (Fruit) { 0 };                                                    \
             sprintf(fruit.name, "fruit%d", i);                                              \
             sprintf(key_str, "FRUIT%d", i);                                                 \
-            err = map_upsert(&mymap, cstr(key_str), fruit);                                \
+            err = map_upsert(&mymap, wcstr(key_str), fruit);                                \
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
@@ -165,9 +165,8 @@ int main(void) {
     allocator_user_data = (void*)&arena;
     RUN_TEST(mapA_bechmark); 
     {
-        int consumed = (int)(arena.beg - root.beg);
-        int total = (int)(root.end - root.beg);
-        printfd("Arena remaining memory "PRIbyte" out of "PRIbyte" (%.1f %%).", PRIbytearg(consumed), PRIbytearg(total), ((float)consumed/(float)total)*100.0);
+        int consumed = (int)(arena.beg - root.buf);
+        printfd("Arena remaining memory "PRIbyte" out of "PRIbyte" (%.1f %%).", PRIbytearg(consumed), PRIbytearg(root.cap), ((float)consumed/(float)root.cap)*100.0);
     }
 
     arena = ArenaRoot_get_arena(root);
@@ -175,9 +174,8 @@ int main(void) {
     allocator_user_data = (void*)&arena;
     RUN_TEST(mapB_bechmark); 
     {
-        int consumed = (int)(arena.beg - root.beg);
-        int total = (int)(root.end - root.beg);
-        printfd("Arena remaining memory "PRIbyte" out of "PRIbyte" (%.1f %%).", PRIbytearg(consumed), PRIbytearg(total), ((float)consumed/(float)total)*100.0);
+        int consumed = (int)(arena.beg - root.buf);
+        printfd("Arena remaining memory "PRIbyte" out of "PRIbyte" (%.1f %%).", PRIbytearg(consumed), PRIbytearg(root.cap), ((float)consumed/(float)root.cap)*100.0);
     }
 
     ArenaRoot_free(&root);

@@ -26,12 +26,15 @@
 #define cstr_SL(sl_arg) ((strview_t){.data=(sl_arg), .size=sizeof(sl_arg)-1})
 #endif
 
+#ifndef _STRVIEW_STRUCT_TYPE_
+#define _STRVIEW_STRUCT_TYPE_
 typedef struct strview_t {
     const char *data;
     int size;
 } strview_t;
+#endif
 
-strview_t cstr(const char* c_str) {
+strview_t wcstr(const char* c_str) {
     return c_str ? (strview_t) { .data = c_str, .size = (int)strlen(c_str) } : STRVIEW_INVALID;
 }
 

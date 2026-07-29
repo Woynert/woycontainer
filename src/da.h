@@ -17,7 +17,9 @@
 
         #define DYNA__TYPE <type>
         #define DYNA__NAMESPACE <custom name> (optional)
-        #define DYNA__ENABLE_COMPARISONS      (optional)
+        #define DYNA__ENABLE_COMPARISONS      (optional, enables sorting, etc.)
+        #define DYNA__ONLY_HEADER             (optional)
+        #define DYNA__ONLY_IMP                (optional)
         #include "dyna.h"
 
     To use a custom allocator use the create_with_allocator function. It receives
@@ -50,8 +52,8 @@
 #define pfx(name) DYNA__TOKCAT(DYNA__TOKCAT(DYNA__NAMESPACE, _), name)
 #define TYPE DYNA__TYPE
 #define Dyna DYNA__NAMESPACE
-
 #define DYNA__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
+#ifndef DYNA__ONLY_IMP
 
 typedef struct {
     int capacity;
@@ -100,6 +102,10 @@ static int   pfx(_round_up_capacity)          (int capacity);
 static DYNA__ALLOC_PROTOTYPE(pfx(_default_allocator));
 
 
+#endif // !HEADER
+#ifndef DYNA__ONLY_HEADER
+
+
 static inline Dyna pfx(create) (void) {
     return (Dyna) { 0 };
 }
@@ -114,7 +120,7 @@ static inline void pfx(free) (Dyna *da) {
     if (da->items != NULL) {
         // free.
         DYNA__ALLOC_PROTOTYPE(*allocator) = da->allocator ? da->allocator : pfx(_default_allocator);
-        allocator(da->items, 0, alignof(TYPE), da->allocator_user_data);
+        allocator(da->items, 0, 0, da->allocator_user_data);
     }
     *da = (Dyna) { 0 };
 }
@@ -428,7 +434,7 @@ static DYNA__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
     return result;
 }
 
-
+#endif // !IMPLEMENTATION
 
 #undef DYNA__TOKCAT_
 #undef DYNA__TOKCAT
@@ -438,6 +444,8 @@ static DYNA__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
 #undef DYNA__TYPE
 #undef DYNA__NAMESPACE
 #undef DYNA__ENABLE_COMPARISONS
+#undef DYNA__ONLY_HEADER
+#undef DYNA__ONLY_IMP
 #undef DYNA__ALLOC_PROTOTYPE
 
 #ifndef DYNA__MACROS

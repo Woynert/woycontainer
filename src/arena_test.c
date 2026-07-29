@@ -7,7 +7,7 @@ int imin(int a, int b) { return a < b ? a : b; }
 size_t size_min(size_t a, size_t b) { return a < b ? a : b; }
 
 bool check_invariants_root(ArenaRoot root) {
-    return (root.beg <= root.end);
+    return (root.buf != NULL);
 }
 
 bool check_invariants_arena(Arena root) {
@@ -39,7 +39,7 @@ TEST test_general(void) {
     }
 
     ArenaRoot_free(&root);
-    ASSERT(root.beg == NULL);
+    ASSERT(root.buf == NULL);
     TEST_PASS;
 }
 

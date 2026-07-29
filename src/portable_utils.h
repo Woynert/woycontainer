@@ -47,6 +47,7 @@ static inline size_t size_t_clamp(size_t min, size_t max, size_t value) { return
 static inline int int_max(int a, int b)                                 { return a > b ? a : b; }
 static inline int int_min(int a, int b)                                 { return a < b ? a : b; }
 static inline int int_clamp(int min, int max, int value)                { return int_max(min, int_min(max, value)); }
+static inline int int_sign(int x) { return (x > 0) - (x < 0); }
 static inline float float_clamp(float min, float max, float value)      { return fmaxf(min, fminf(max, value)); }
 static inline bool int_in_range_inclusive(int min, int max, int value)  { return value >= min && value <= max; }
 

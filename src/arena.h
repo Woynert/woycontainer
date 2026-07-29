@@ -12,8 +12,8 @@
 
 
 typedef struct ArenaRoot {
-    char * beg;
-    char * end;
+    char *buf;
+    i64 cap;
 } ArenaRoot;
 
 
@@ -24,21 +24,23 @@ typedef struct Arena {
 
 
 ArenaRoot ArenaRoot_create(i64 cap) {
-    char *beg = (char *)malloc((size_t)cap);
-    char *end = beg ? beg + cap : 0;
-    return (ArenaRoot) { .beg = beg, .end = end };
+    char *buf = (char *)malloc((size_t)cap);
+    return (ArenaRoot) {
+        .buf = buf,
+        .cap = buf ? cap : 0,
+    };
 }
 
 
-void ArenaRoot_free(ArenaRoot *root) {
-    if (root->beg == NULL) { return; }
-    free(root->beg);
-    memset(root, 0, sizeof(ArenaRoot)); // Invalidate it.
+void ArenaRoot_free(ArenaRoot *r) {
+    if (r->buf == NULL) { return; }
+    free(r->buf);
+    *r = (ArenaRoot) { 0 };
 }
 
 
-Arena ArenaRoot_get_arena(ArenaRoot root) {
-    return (Arena) {.beg = root.beg, .end = root.end};
+Arena ArenaRoot_get_arena(ArenaRoot r) {
+    return (Arena) {.beg = r.buf, .end = r.buf ? r.buf + r.cap : NULL};
 }
 
 
@@ -50,7 +52,7 @@ void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
     ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
     ptrdiff_t available = a->end - a->beg - padding;
     if (available <= 0 || count > available / size) {
-        printf("OUT OF MEMORY.");
+        printfd("OUT OF MEMORY.");
         //return NULL;
         wassert(false); // OOM.
     }
@@ -58,13 +60,21 @@ void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
     a->beg += padding + count * size;
     return memset(p, 0, (size_t)(count * size));
 }
-
-
 #define arena_new_align(arena, T, align_T, count) \
     (T *)arena_alloc(arena, sizeof(T), _Alignof(align_T), count)
-
 #define arena_new(arena, T, count) \
     (T *)arena_alloc(arena, sizeof(T), _Alignof(T), count)
+
+
+/*
+bool arena__can_fit(Arena *a, i64 size, i64 align, i64 count) {
+    ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
+    ptrdiff_t available = a->end - a->beg - padding;
+    return !(available <= 0 || count > available / size);
+}
+#define arena_can_fit(arena, T, count)\
+    arena__can_fit(arena, sizeof(T), _Alignof(T), count)
+*/
 
 
 #endif // !ARENA_H

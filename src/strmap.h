@@ -63,7 +63,7 @@ typedef struct STRMAP__PRI(Bucket) {
 #define STRMAP__REHASH_FACTOR 0.7
 
 
-typedef struct {
+typedef struct Strmap {
     pri(Bucket_Array) buckets;
     strpool strpool;
     int pair_count;
@@ -71,6 +71,13 @@ typedef struct {
     STRMAP__ALLOC_PROTOTYPE(*allocator);
     void *allocator_userdata;
 } Strmap;
+
+typedef struct pub(It) {
+    STRMAP__TYPE *value;
+    strview_t key;        // Read only.
+    int __bucket_id;
+    int __pair_id;
+} pub(It);
 
 
 int pub(upsert)(Strmap *m, strview_t key, STRMAP__TYPE value);
@@ -306,6 +313,21 @@ static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, i
     }
     ++m->pair_count;
     return 0;
+}
+
+
+/// @Note. Modifying the map while iterating is UB.
+bool pub(it_next)(const Strmap *m, pub(It) *it) {
+    for (; it->__bucket_id < m->buckets.size; ++it->__bucket_id, it->__pair_id = 0) {
+        for (; it->__pair_id < m->buckets.items[it->__bucket_id].pairs.size;) {
+            int key_str_id = m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].key;
+            it->value = &m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].value;
+            it->key = strpool_get(&m->strpool, key_str_id);
+            ++it->__pair_id;
+            return true;
+        }
+    }
+    return false;
 }
 
 
