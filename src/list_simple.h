@@ -30,13 +30,16 @@ static LIST__ALLOC_PROTOTYPE(pri(default_allocator));
 typedef struct pri(Node) pri(Node);
 typedef struct pri(Node) {
     pri(Node) *next;
+    pri(Node) *prev;
     TYPE item;
 } pri(Node);
 
 typedef struct LIST {
-    pri(Node) *root;
+    pri(Node) *head;
+    pri(Node) *tail;
     void *allocator_userdata;
     LIST__ALLOC_PROTOTYPE(*allocator);
+    int size;
 } LIST;
 
 typedef struct pub(It) {
@@ -55,7 +58,7 @@ static LIST pub(create_with_allocator) (LIST__ALLOC_PROTOTYPE(*allocator), void 
 
 static void pub(free) (LIST *l) {
     LIST__ALLOC_PROTOTYPE(*allocator) = l->allocator ? l->allocator : pri(default_allocator);
-    pri(Node) *node = l->root;
+    pri(Node) *node = l->head;
     while (node != NULL) {
         pri(Node) *next = node->next;
         allocator(node, 0, 0, l->allocator_userdata); // Free.
@@ -65,23 +68,81 @@ static void pub(free) (LIST *l) {
 }
 
 static int pub(append) (LIST *l, TYPE item) {
-    pri(Node) **node = &l->root;
+    pri(Node) **node = &l->head;
     while (*node != NULL) {
         node = &(*node)->next;
     }
     LIST__ALLOC_PROTOTYPE(*allocator) = l->allocator ? l->allocator : pri(default_allocator);
     *node = (pri(Node)*)allocator(NULL, sizeof(pri(Node)), alignof(pri(Node)), l->allocator_userdata);
     if (*node == NULL) { return -1; }
-    **node = (pri(Node)) { 0 };
-    (*node)->item = item;
+    **node = (pri(Node)) { .item = item, .prev = l->tail, };
+    l->tail = *node;
+    ++l->size;
+    return 0;
+}
+
+static int pub(append_front) (LIST *l, TYPE item) {
+    LIST__ALLOC_PROTOTYPE(*allocator) = l->allocator ? l->allocator : pri(default_allocator);
+    pri(Node) *node = (pri(Node)*)allocator(NULL, sizeof(pri(Node)), alignof(pri(Node)), l->allocator_userdata);
+    *node = (pri(Node)) { .item = item };
+    if (!node) { return -1; }
+    node->next = l->head;
+    l->head = node;
+    if (node->next) { node->next->prev = l->head; }
+    ++l->size;
     return 0;
 }
 
 static bool pub(it_next) (LIST *l, pub(It) *it) {
-    if (it->__node == NULL) { it->__node = l->root; }
+    if (it->__node == NULL) { it->__node = l->head; }
     else { it->__node = it->__node->next; }
     if (it->__node != NULL) { it->item = &it->__node->item; }
     return it->__node != NULL;
+}
+
+static bool pub(it_prev) (LIST *l, pub(It) *it) {
+    if (it->__node == NULL) { it->__node = l->tail; }
+    else { it->__node = it->__node->prev; }
+    if (it->__node != NULL) { it->item = &it->__node->item; }
+    return it->__node != NULL;
+}
+
+static int pub(remove) (LIST *l, pub(It) *it) {
+    if (it->__node == NULL) { return -1; }
+    LIST__ALLOC_PROTOTYPE(*allocator) = l->allocator ? l->allocator : pri(default_allocator);
+    pub(It) copy = *it;
+    pub(it_next)(l, it);
+    if (copy.__node->prev) { copy.__node->prev->next = copy.__node->next; }
+    if (copy.__node->next) { copy.__node->next->prev = copy.__node->prev; }
+    if (copy.item) { allocator(copy.item, 0, 0, l->allocator_userdata); }
+    if (l->head == copy.__node) { l->head = copy.__node->next; }
+    if (l->tail == copy.__node) { l->tail = copy.__node->prev; }
+    --l->size;
+    return 0;
+}
+
+static TYPE *pub(get_head) (LIST *l) {
+    if (l->head) { return &l->head->item; } return NULL;
+}
+
+static TYPE *pub(get_tail) (LIST *l) {
+    if (l->tail) { return &l->tail->item; } return NULL;
+}
+
+static pub(It) pub(get_head_it) (LIST *l) {
+    pub(It) it = {0}; pub(it_next)(l, &it); return it;
+}
+
+static pub(It) pub(get_tail_it) (LIST *l) {
+    pub(It) it = {0}; pub(it_prev)(l, &it); return it;
+}
+
+static int pub(remove_head) (LIST *l) {
+    pub(It) it = pub(get_head_it)(l); return pub(remove)(l, &it);
+}
+
+static int pub(remove_tail) (LIST *l) {
+    pub(It) it = pub(get_tail_it)(l); return pub(remove)(l, &it);
 }
 
 static LIST__ALLOC_PROTOTYPE(pri(default_allocator)) {

@@ -16,6 +16,7 @@
 #ifndef PRIstr
 #define PRIstr ".*s"
 #endif
+#define PRIstrw "%.*s"
 #ifndef PRIstrarg
 #define PRIstrarg(arg) ((arg).size),((arg).data)
 #endif
@@ -25,6 +26,7 @@
 #ifndef cstr_SL
 #define cstr_SL(sl_arg) ((strview_t){.data=(sl_arg), .size=sizeof(sl_arg)-1})
 #endif
+#define cstr_SL_const(sl_arg) {.data=(sl_arg), .size=sizeof(sl_arg)-1}
 
 #ifndef _STRVIEW_STRUCT_TYPE_
 #define _STRVIEW_STRUCT_TYPE_

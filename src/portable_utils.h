@@ -84,8 +84,8 @@ static int int_digit_places (int n) {
         if ((!!(value)) != true) { \
             printf("\nFAILED ASSERT %s|%s:%d\n", \
                     __func__, __FILE__, __LINE__); \
-            printf(#value); \
-            printf("\n"); \
+            printf(ANSI_RED#value); \
+            printf(ANSI_RESET"\n"); \
             __asm__("int3"); \
             exit(1); \
         } \
@@ -105,12 +105,15 @@ static int int_digit_places (int n) {
 #define printval(fmt, ...) do { printf(#__VA_ARGS__" "fmt"\n", ##__VA_ARGS__); } while(0)
 #define printvalnum(var) do { printf( #var " = %d\n", var); } while(0)
 
-#define PRIbool(arg) (arg ? "true" : "false")
+#define Bool_Fmt "%s"
+#define Bool_Arg(x) (x ? "true" : "false")
 
 #define countof(a)         (sizeof(a) / sizeof(*(a)))
 #define countofi(a)  ((int)(sizeof(a) / sizeof(*(a))))
 //#define sizeof(x)    (ptrdiff_t)sizeof(x)
 //#define lengthof(s)  (countof(s) - 1)
+
+#define ZERO(x) do { memset(&x, 0, sizeof(x)); } while(0)
 
 #define foreachi(type_i, type_item, iter, array, size) \
     struct { type_i index; type_item *ref; } iter = { .index = 0, .ref = (array) }; iter.index < size; ++iter.index, ++iter.ref
