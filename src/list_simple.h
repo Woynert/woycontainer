@@ -89,6 +89,7 @@ static int pub(append_front) (LIST *l, TYPE item) {
     node->next = l->head;
     l->head = node;
     if (node->next) { node->next->prev = l->head; }
+    else { l->tail = node; }
     ++l->size;
     return 0;
 }

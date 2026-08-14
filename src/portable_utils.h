@@ -41,10 +41,29 @@ static long get_system_ms(void) {
     #endif
 }
 
+static long get_system_ns(void) {
+    struct timespec ts = { 0 };
+    clock_gettime(CLOCK_MONOTONIC, &ts); // Could fail but we still return 0.
+    return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
+static void sleep_ns(long long ns){
+    struct timespec ts;
+    ts.tv_sec = ns / 1000000000LL;
+    ts.tv_nsec = (ns % 1000000000LL);
+    nanosleep(&ts, NULL);
+}
+#define sec2ns(x) ((x) * 1000000000)
+#define ms2ns(x) ((x) * 1000000)
+#define ns2secf(x) ((x) / 1000000000.f)
+#define ns2msf(x) ((x) / 1000000.f)
+//#define ns2sec(x) ((x) / 1000000000.f)
+//#define ns2ms(x) ((x) / 1000000.f)
+
 static inline size_t size_t_max(size_t a, size_t b)                     { return a > b ? a : b; }
 static inline size_t size_t_min(size_t a, size_t b)                     { return a < b ? a : b; }
 static inline size_t size_t_clamp(size_t min, size_t max, size_t value) { return size_t_max(min, size_t_min(max, value)); }
 static inline int int_max(int a, int b)                                 { return a > b ? a : b; }
+static inline long long long_long_max(long long a, long long b)         { return a > b ? a : b; }
 static inline int int_min(int a, int b)                                 { return a < b ? a : b; }
 static inline int int_clamp(int min, int max, int value)                { return int_max(min, int_min(max, value)); }
 static inline int int_sign(int x) { return (x > 0) - (x < 0); }
@@ -100,6 +119,8 @@ static int int_digit_places (int n) {
         printf(ANSI_YEL fmt, ##__VA_ARGS__); \
         printf(ANSI_RESET" %s:%s:%d\n", __func__, __FILE__, __LINE__); \
     } while (0)
+
+#define printferr(fmt, ...) printfd(ANSI_RED"Err: "fmt, ##__VA_ARGS__)
 
 
 #define printval(fmt, ...) do { printf(#__VA_ARGS__" "fmt"\n", ##__VA_ARGS__); } while(0)
