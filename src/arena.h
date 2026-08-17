@@ -61,9 +61,9 @@ void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
     return memset(p, 0, (size_t)(count * size));
 }
 #define arena_new_align(arena, T, align_T, count) \
-    (T *)arena_alloc(arena, sizeof(T), _Alignof(align_T), count)
+    (T *)arena_alloc(arena, sizeof(T), _Alignof(align_T), (count))
 #define arena_new(arena, T, count) \
-    (T *)arena_alloc(arena, sizeof(T), _Alignof(T), count)
+    (T *)arena_alloc(arena, sizeof(T), _Alignof(T), (count))
 
 
 /*

@@ -110,6 +110,19 @@ static int int_digit_places (int n) {
         } \
     } while (0)
 
+#define wassert_msg(value, msg) \
+    do { \
+        if ((!!(value)) != true) { \
+            printf("\nFAILED ASSERT %s|%s:%d\n", \
+                    __func__, __FILE__, __LINE__); \
+            printf(msg"\n"); \
+            printf(ANSI_RED#value); \
+            printf(ANSI_RESET"\n"); \
+            __asm__("int3"); \
+            exit(1); \
+        } \
+    } while (0)
+
 #define static_assert _Static_assert
 
 #define wstatic_assert(x) static_assert(x, #x)
@@ -127,7 +140,7 @@ static int int_digit_places (int n) {
 #define printvalnum(var) do { printf( #var " = %d\n", var); } while(0)
 
 #define Bool_Fmt "%s"
-#define Bool_Arg(x) (x ? "true" : "false")
+#define Bool_Arg(x) ((x) ? "true" : "false")
 
 #define countof(a)         (sizeof(a) / sizeof(*(a)))
 #define countofi(a)  ((int)(sizeof(a) / sizeof(*(a))))
@@ -153,7 +166,7 @@ const char *byte_human_format(uint64_t b) {
     static char storage_buf[1 << BUF_EXP_SIZE][BUF_SIZE];
     char *buf = storage_buf[idx];
     idx = (idx + 1) & ((1 << BUF_EXP_SIZE) -1);
-    snprintf(buf, BUF_SIZE, "%.02lf(%s)",
+    snprintf(buf, BUF_SIZE, "~%.02lf(%s)",
     b >= (1ull << 40) ? (double)(b) / (double)(1ull << 40) :
     b >= (1ull << 30) ? (double)(b) / (double)(1ull << 30) :
     b >= (1ull << 20) ? (double)(b) / (double)(1ull << 20) :
@@ -162,6 +175,17 @@ const char *byte_human_format(uint64_t b) {
     b >= (1ull << 20) ? "MiB" : b >= (1ull << 10) ? "KiB" : "B");
     return buf;
     // 28 bytes -> "9223372036854775807.00(TiB)\0"
+}
+
+#define malloc_new(T, count) \
+    (T *)malloc(sizeof(T) * (size_t)(count))
+
+
+// Finds a multiple of a number which makes it less or equal to a cap.
+// @returns Number or 0 if not found.
+int find_multiple_max_fit(int n, int cap) {
+    if (n <= 0 || cap <= 0) { return 0; }
+    return (int)floorf((float)cap / (float)n);
 }
 
 #endif

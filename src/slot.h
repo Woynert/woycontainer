@@ -8,6 +8,7 @@
     * Pro: Growable.
     * Pro: Valid items are contiguous (aka. Items are iterable).
     * Con: Order not preserved.
+    * Con: Previously deleted ids will be reutilized often.
 */
 
 #include <stdalign.h>
