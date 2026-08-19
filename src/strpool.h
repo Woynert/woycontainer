@@ -323,7 +323,7 @@ int strpool_append(Strpool *p, STRPOOL_STR view) {
 
 
 int strpool_remove(Strpool *p, int view_id) {
-    if (view_id == 0) { return -1; } // ID zero is reserved.
+    if (view_id == 0) { return 0; } // ID zero is reserved.
     int i_curr;
     int view_chunks;
     {
