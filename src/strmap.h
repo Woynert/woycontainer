@@ -65,7 +65,7 @@ typedef struct STRMAP__PRI(Bucket) {
 
 typedef struct Strmap {
     pri(Bucket_Array) buckets;
-    strpool strpool;
+    Strpool strpool;
     int pair_count;
 
     STRMAP__ALLOC_PROTOTYPE(*allocator);
@@ -202,7 +202,7 @@ void pri(rehash_if_needed)(Strmap *old_m) {
 
     // Swap stringpools.
     {
-        strpool bk = new_m->strpool;
+        Strpool bk = new_m->strpool;
         new_m->strpool = old_m->strpool;
         old_m->strpool = bk;
     }

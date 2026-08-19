@@ -48,6 +48,7 @@ void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
 {
     // Source https://nullprogram.com/blog/2023/09/27/
     // Question: Why the negative in the padding works?
+    // TODO: Realloc flag to expand the last allocated size.
 
     ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
     ptrdiff_t available = a->end - a->beg - padding;

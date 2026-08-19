@@ -65,7 +65,6 @@ typedef struct strpool__Node {
 typedef struct strpool{
     struct {
         int capacity; // Measured in chunks or nodes.
-        int cursor;
         strpool__Node *nodes;
     };
 
@@ -75,23 +74,24 @@ typedef struct strpool{
 
     STRPOOL__ALLOC_PROTOTYPE(*allocator);
     void *allocator_user_data;
-} strpool;
+} Strpool;
 
 
 
-int          strpool_create(strpool *p);
-int          strpool_create_with_allocator(strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data);
-void         strpool_destroy(strpool *p);
-int          strpool_append(strpool *p, STRPOOL_STR view);
-STRPOOL_STR  strpool_get(const strpool *p, int view_id);
-int          strpool_remove(strpool *p, int view_id);
-size_t       strpool_report_memory(const strpool *p);
+int          strpool_create(Strpool *p);
+int          strpool_create_with_allocator(Strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data);
+void         strpool_destroy(Strpool *p);
+int          strpool_append(Strpool *p, STRPOOL_STR view);
+STRPOOL_STR  strpool_get(const Strpool *p, int view_id);
+int          strpool_remove(Strpool *p, int view_id);
+size_t       strpool_report_memory(const Strpool *p);
+void         strpool_clear(Strpool *p);
 
-int            strpool__grow(strpool *p, int min_size);
-strpool__Node *strpool__get_node(const strpool *p, int i);
-int            strpool__find_node_just_before(const strpool *p, int target_offset);
-void           strpool__integrate_new_free_node(strpool *p, int i_curr, int curr_chunks);
-int            strpool__find_space(const strpool *p, int space, int *out_i_prev_node);
+int            strpool__grow(Strpool *p, int min_size);
+strpool__Node *strpool__get_node(const Strpool *p, int i);
+int            strpool__find_node_just_before(const Strpool *p, int target_offset);
+void           strpool__integrate_new_free_node(Strpool *p, int i_curr, int curr_chunks);
+int            strpool__find_space(const Strpool *p, int space, int *out_i_prev_node);
 static int     strpool__pow2roundup(int x);
 static int     strpool__div_ceil(int x, int y);
 static int     strpool__int_max(int x, int y) { return x > y ? x : y; }
@@ -100,8 +100,8 @@ static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator);
 
 
 /// @Returns Error.
-int strpool_create_with_allocator(strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data) {
-    *p = (strpool) { 0 };
+int strpool_create_with_allocator(Strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data) {
+    *p = (Strpool) { 0 };
     p->allocator = allocator;
     p->allocator_user_data = allocator_user_data;
     p->i_first_free_node = -1;
@@ -116,12 +116,14 @@ int strpool_create_with_allocator(strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocato
         strpool__view_Slot_free(&p->views);
         return -1;
     }
+
+    strpool_append(p, STRVIEW_INVALID); // ID zero is always empty string.
     return 0;
 }
 
 
 /// @Returns Error.
-int strpool_create(strpool *p) {
+int strpool_create(Strpool *p) {
     return strpool_create_with_allocator(p, NULL, NULL);
 }
 
@@ -148,7 +150,7 @@ static inline int strpool__pow2roundup (int x) {
 }
 
 
-strpool__Node *strpool__get_node(const strpool *p, int i) {
+strpool__Node *strpool__get_node(const Strpool *p, int i) {
     if (i < 0 || i >= p->capacity) { return NULL; }
     return &p->nodes[i];
 }
@@ -156,7 +158,7 @@ strpool__Node *strpool__get_node(const strpool *p, int i) {
 
 /// @Returns id.
 /// @Retval -1 If not found (or root).
-int strpool__find_node_just_before(const strpool *p, int target_offset) {
+int strpool__find_node_just_before(const Strpool *p, int target_offset) {
     int i_prev_node = -1;
     int i_node = p->i_first_free_node;
     for (;;) {
@@ -171,7 +173,7 @@ int strpool__find_node_just_before(const strpool *p, int target_offset) {
 }
 
 
-void strpool__integrate_new_free_node(strpool *p, int i_curr, int curr_chunks) {
+void strpool__integrate_new_free_node(Strpool *p, int i_curr, int curr_chunks) {
     int i_prev = strpool__find_node_just_before(p, i_curr);
     int i_next = -1;
     strpool__Node *node_prev = strpool__get_node(p, i_prev);
@@ -213,7 +215,7 @@ void strpool__integrate_new_free_node(strpool *p, int i_curr, int curr_chunks) {
 
 
 /// @Returns error.
-int strpool__grow(strpool *p, int min_size) {
+int strpool__grow(Strpool *p, int min_size) {
     // I need: A power of two which is just bigger or equal that min_size.
     int new_capacity = strpool__pow2roundup(min_size);
     if (new_capacity == p->capacity) { return 0; }
@@ -235,17 +237,17 @@ int strpool__grow(strpool *p, int min_size) {
 }
 
 
-void strpool_destroy(strpool *p) {
+void strpool_destroy(Strpool *p) {
     STRPOOL__ALLOC_PROTOTYPE(*allocator) = p->allocator != NULL ? p->allocator : strpool__default_allocator;
     allocator(p->nodes, 0, 0, p->allocator_user_data);
     strpool__view_Slot_free(&p->views);
-    *p = (strpool) { 0 };
+    *p = (Strpool) { 0 };
 }
 
 
 /// @param[out] out_i_prev_node. Index for the node previous to the one with space.
 /// @Returns id or -1 on error.
-int strpool__find_space(const strpool *p, int space, int *out_i_prev_node) {
+int strpool__find_space(const Strpool *p, int space, int *out_i_prev_node) {
     int i_prev_node = -1;
     int i_node = p->i_first_free_node; 
     strpool__Node *node = strpool__get_node(p, i_node);
@@ -268,7 +270,7 @@ int strpool__find_space(const strpool *p, int space, int *out_i_prev_node) {
 
 /// @returns index or -1.
 /// @reval   -1 Error.
-int strpool_append(strpool *p, STRPOOL_STR view) {
+int strpool_append(Strpool *p, STRPOOL_STR view) {
     int i_node_prev = -1;
     int i_node = -1;
 
@@ -320,7 +322,8 @@ int strpool_append(strpool *p, STRPOOL_STR view) {
 }
 
 
-int strpool_remove(strpool *p, int view_id) {
+int strpool_remove(Strpool *p, int view_id) {
+    if (view_id == 0) { return -1; } // ID zero is reserved.
     int i_curr;
     int view_chunks;
     {
@@ -339,7 +342,7 @@ int strpool_remove(strpool *p, int view_id) {
 
 
 /// @Returns view or INVALID_VIEW If not found. An invalid view is .data == NULL.
-STRPOOL_STR strpool_get(const strpool *p, int view_id) {
+STRPOOL_STR strpool_get(const Strpool *p, int view_id) {
     strpool__view *view = strpool__view_Slot_get(&p->views, view_id);
     if (view == NULL) {
         return (STRPOOL_STR) { .data = NULL, .size = 0, };
@@ -348,11 +351,20 @@ STRPOOL_STR strpool_get(const strpool *p, int view_id) {
 }
 
 
-size_t strpool_report_memory(const strpool *p) {
-    size_t count = sizeof(strpool);
+size_t strpool_report_memory(const Strpool *p) {
+    size_t count = sizeof(Strpool);
     count += (size_t)p->capacity * sizeof(strpool__Node);
     count += strpool__view_Slot_report_memory(&p->views);
     return count;
+}
+
+
+void strpool_clear(Strpool *p) {
+    p->i_first_free_node = -1;
+    strpool__view_Slot_clear(&p->views);
+    memset(p->nodes, 0, sizeof(strpool__Node) * (size_t)p->capacity);
+    strpool__integrate_new_free_node(p, 0, p->capacity);
+    strpool_append(p, STRVIEW_INVALID); // ID zero is always empty string.
 }
 
 

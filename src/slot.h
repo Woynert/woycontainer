@@ -101,6 +101,14 @@ void pfx(free)(Slot *s) {
     *s = (Slot) { 0 };
 }
 
+void pfx(clear)(Slot *s) {
+    for (int i = 0; i < s->capacity; ++i) {
+        s->itemid_to_userid[i] = i;
+        s->userid_to_itemid[i] = i;
+    }
+    s->count = 0;
+}
+
 
 // @Returns item id, or -1 on error.
 int pfx(append)(Slot *s, TYPE item) {
