@@ -37,7 +37,7 @@ typedef struct pri(Node) {
 
 
 typedef struct Map {
-    strpool strpool;
+    Strpool strpool;
 
     pri(Node) *items;
     int size_exp;

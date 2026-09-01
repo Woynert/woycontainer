@@ -31,6 +31,7 @@ void print_slot(const Fruit_Slot *s) {
 TEST test_general(void) {
 
     Fruit fruit;
+    Fruit *f = NULL;
 
     Fruit_Slot s = { 0 };
     int err = Fruit_Slot_create(&s);
@@ -75,12 +76,14 @@ TEST test_general(void) {
     ASSERT_INT(Fruit_Slot_pop(&s, apple_id), 0);
     print_slot(&s);
     ASSERT_INT(s.count, 4);
+    ASSERT(NULL == Fruit_Slot_get(&s, apple_id));
     apple_id = -1;
 
     printf("\n\nDeleting kiwi_id %d\n", kiwi_id);
     ASSERT_INT(Fruit_Slot_pop(&s, kiwi_id), 0);
     print_slot(&s);
     ASSERT_INT(s.count, 3);
+    ASSERT(NULL == Fruit_Slot_get(&s, kiwi_id));
     kiwi_id = -1;
 
     fruit = (Fruit) { "Banana" };
@@ -105,13 +108,12 @@ TEST test_general(void) {
     ASSERT_INT(Fruit_Slot_pop(&s, orange_id), 0);
     print_slot(&s);
     ASSERT_INT(s.count, 5);
+    ASSERT(NULL == Fruit_Slot_get(&s, orange_id));
     orange_id = -1;
 
     printf("\nEND\n");
 
     // Reading back.
-
-    Fruit *f = NULL;
 
     f = Fruit_Slot_get(&s, banana_id);
     ASSERT(f != NULL);
@@ -143,27 +145,35 @@ TEST test_general(void) {
 
     printf("Removing "); printvalnum(mandarina_id);
     err = Fruit_Slot_pop(&s, mandarina_id);
+    ASSERT(NULL == Fruit_Slot_get(&s, mandarina_id));
     ASSERT_INT(err, 0);
     printf("Removing "); printvalnum(apple_id);
     err = Fruit_Slot_pop(&s, apple_id);
+    ASSERT(NULL == Fruit_Slot_get(&s, apple_id));
     ASSERT_INT_NEQ(err, 0);
     printf("Removing "); printvalnum(guanabana_id);
     err = Fruit_Slot_pop(&s, guanabana_id);
+    ASSERT(NULL == Fruit_Slot_get(&s, guanabana_id));
     ASSERT_INT(err, 0);
     printf("Removing "); printvalnum(orange_id);
     err = Fruit_Slot_pop(&s, orange_id);
+    ASSERT(NULL == Fruit_Slot_get(&s, orange_id));
     ASSERT_INT_NEQ(err, 0);
     printf("Removing "); printvalnum(banana_id);
     err = Fruit_Slot_pop(&s, banana_id);
+    ASSERT(NULL == Fruit_Slot_get(&s, banana_id));
     ASSERT_INT(err, 0);
     printf("Removing "); printvalnum(kiwi_id);
     err = Fruit_Slot_pop(&s, kiwi_id);
+    ASSERT(NULL == Fruit_Slot_get(&s, kiwi_id));
     ASSERT_INT_NEQ(err, 0);
     printf("Removing "); printvalnum(frog_id);
     err = Fruit_Slot_pop(&s, frog_id);
+    ASSERT(NULL == Fruit_Slot_get(&s, frog_id));
     ASSERT_INT(err, 0);
     printf("Removing "); printvalnum(coco_id);
     err = Fruit_Slot_pop(&s, coco_id);
+    ASSERT(NULL == Fruit_Slot_get(&s, coco_id));
     ASSERT_INT(err, 0);
     ASSERT_INT(s.count, 0);
 

@@ -12,7 +12,7 @@ bool strview_is_valid(Str mystr) {
     return mystr.data != NULL;
 }
 
-int strpool__get_free_node_mount(strpool *p) {
+int strpool__get_free_node_mount(Strpool *p) {
     int count = 0;
     int i_node = p->i_first_free_node;
     for (;;) {
@@ -24,7 +24,7 @@ int strpool__get_free_node_mount(strpool *p) {
     return count;
 }
 
-void strpool_print_debug(strpool *p) {
+void strpool_print_debug(Strpool *p) {
     // TODO: 2. Print pairs of index->Str.
     // TODO: 3. Print binary representation of the whole thing.
     // TODO: 1. Print chain of free nodes.
@@ -53,7 +53,7 @@ void strpool_print_debug(strpool *p) {
 }
 
 TEST test_general(void) {
-    strpool pool = { 0 };
+    Strpool pool = { 0 };
     int err = strpool_create(&pool);
     ASSERT(err == 0);
     strpool_print_debug(&pool);

@@ -73,9 +73,12 @@ void *arenady_alloc(ArenaDy *a, i64 size, i64 align, i64 count)
             wassert(false); // OOM.
         }
     }
+
+    // @Note: Cleaning the padding will make binary comparisons possible.
+    if (padding > 0) { memset(a->beg, 0, (size_t)padding); }
     void *p = a->beg + padding;
     a->beg += padding + count * size;
-    //return memset(p, 0, (size_t)(count * size));
+    //return memset(p, 0, (size_t)(count * size)); // <--
     return p;
 }
 #define arenady_new(arena, T, count) \

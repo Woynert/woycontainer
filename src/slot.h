@@ -9,6 +9,8 @@
     * Pro: Valid items are contiguous (aka. Items are iterable).
     * Con: Order not preserved.
     * Con: Previously deleted ids will be reutilized often.
+
+    Todo: I would want a version with increasing ids with wrap around at INT_MAX.
 */
 
 #include <stdalign.h>
@@ -129,7 +131,7 @@ int pfx(append)(Slot *s, TYPE item) {
 TYPE *pfx(get)(const Slot *s, int user_id) {
     if (user_id < 0 || user_id > s->capacity) { return NULL; }
     int item_id = s->userid_to_itemid[user_id];
-    if (item_id > s->count) { return NULL; }
+    if (item_id >= s->count) { return NULL; }
     return &s->items[item_id];
 }
 

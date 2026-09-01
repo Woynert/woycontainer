@@ -315,7 +315,7 @@ int strpool_append(Strpool *p, STRPOOL_STR view) {
     }
 
     // Write view.
-    memcpy(writing_area, view.data, (size_t)view.size);
+    if (view.size > 0) { memcpy(writing_area, view.data, (size_t)view.size); }
     new_view->offset = i_node;
     new_view->size = view.size;
     return view_id;
@@ -334,7 +334,7 @@ int strpool_remove(Strpool *p, int view_id) {
         i_curr = view->offset;
         view_chunks = strpool__div_ceil(view->size, STRPOOL__CHUNK);
     }
-    strpool__view_Slot_pop(&p->views, view_id);
+    int err = strpool__view_Slot_pop(&p->views, view_id);
     if (view_chunks == 0) { return 0; } // Empty string.
     strpool__integrate_new_free_node(p, i_curr, view_chunks);
     return 0;

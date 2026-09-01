@@ -38,7 +38,7 @@ bool should_find_these(const List_Fruit *l, Fruit *p_items, const int item_amoun
         items[i].item = p_items[i];
     }
 
-    for (List_Fruit__Node *node = l->root; node != NULL; node = node->next) {
+    for (List_Fruit__Node *node = l->head; node != NULL; node = node->next) {
         ++valid_items_found_count;
         // See if it corresponds to one item.
         for (int k = 0; k < item_amount; ++k) {
@@ -99,7 +99,7 @@ TEST test_general(void) {
     // TODO: An easy way to iterate through it.
 
     int count = 0;
-    for (List_Fruit__Node *node = l->root; node != NULL; node = node->next) {
+    for (List_Fruit__Node *node = l->head; node != NULL; node = node->next) {
         /*printfd("List has item [%s]", node->item.name);*/
         ++count;
     }
