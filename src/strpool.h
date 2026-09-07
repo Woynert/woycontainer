@@ -52,7 +52,6 @@ typedef struct strpool__view {
 #include "slot.h"
 
 
-typedef struct strpool__Node strpool__Node;
 typedef struct strpool__Node {
     int free_chunks;
     int i_next_node; // Index to nodes.
@@ -62,7 +61,7 @@ typedef struct strpool__Node {
 #define STRPOOL__CHUNK ((int)sizeof(strpool__Node))
 
 
-typedef struct strpool{
+typedef struct Strpool {
     struct {
         int capacity; // Measured in chunks or nodes.
         strpool__Node *nodes;
@@ -83,6 +82,7 @@ int          strpool_create_with_allocator(Strpool *p, STRPOOL__ALLOC_PROTOTYPE(
 void         strpool_destroy(Strpool *p);
 int          strpool_append(Strpool *p, STRPOOL_STR view);
 STRPOOL_STR  strpool_get(const Strpool *p, int view_id);
+STRPOOL_STR  strpool_get_from_view(const Strpool *p, strpool__view view);
 int          strpool_remove(Strpool *p, int view_id);
 size_t       strpool_report_memory(const Strpool *p);
 void         strpool_clear(Strpool *p);
@@ -341,13 +341,18 @@ int strpool_remove(Strpool *p, int view_id) {
 }
 
 
+inline STRPOOL_STR strpool_get_from_view(const Strpool *p, strpool__view view) {
+    return (STRPOOL_STR) { .data = (char *)((strpool__Node *)p->nodes + view.offset), .size = view.size, };
+}
+
+
 /// @Returns view or INVALID_VIEW If not found. An invalid view is .data == NULL.
 STRPOOL_STR strpool_get(const Strpool *p, int view_id) {
     strpool__view *view = strpool__view_Slot_get(&p->views, view_id);
     if (view == NULL) {
         return (STRPOOL_STR) { .data = NULL, .size = 0, };
     }
-    return (STRPOOL_STR) { .data = (char *)((strpool__Node *)p->nodes + view->offset), .size = view->size, };
+    return strpool_get_from_view(p, *view);
 }
 
 

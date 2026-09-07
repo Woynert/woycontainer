@@ -1,28 +1,23 @@
 /*
-   Fixed size array container. Can be resized to any desired size.
-  
+   Fixed size array container. Can be manually resized.
+
    Usage:
-  
-   #define ARRAY__TYPE <type>
-   #define ARRAY__NAMESPACE <custom name> (optional)
-   #define ARRAY__ENABLE_COMPARISONS      (optional)
-   #define ARRAY__IS_BUFFER               (optional)
-   #include "sizedbuffer.h"
+       #define ARRAY__TYPE <type>
+       #define ARRAY__NAMESPACE <custom name> (optional)
+       #include "array.h"
 */
 
 #include <limits.h>
 #include <stdalign.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 
-/* User didn't specify type, using default. */
 #ifndef ARRAY__TYPE
 #define ARRAY__TYPE uint
-#define ARRAY__ENABLE_COMPARISONS
 #endif
 
-/* Token concatenation. */
 #define ARRAY__TOKCAT_(a, b) a ## b
 #define ARRAY__TOKCAT(a, b) ARRAY__TOKCAT_(a, b)
 #ifndef ARRAY__NAMESPACE
@@ -75,7 +70,7 @@ static Array pfx(create_with_allocator) (ARRAY__ALLOC_PROTOTYPE(*allocator), voi
 
 static inline void pfx(destroy) (Array *a) {
     if (a->items != NULL) {
-        ARRAY__ALLOC_PROTOTYPE(*allocator) = a->allocator != NULL ? a->allocator : pfx(_default_allocator);
+        ARRAY__ALLOC_PROTOTYPE(*allocator) = a->allocator ? a->allocator : pfx(_default_allocator);
         // Free.
         allocator(a->items, 0, 0, a->allocator_userdata);
     }
@@ -89,10 +84,10 @@ static int pfx(resize) (Array *a, int new_size) {
     if (new_size <= 0) { return -1; }
     if (a->size == new_size) { return 0; }
 
-    ARRAY__ALLOC_PROTOTYPE(*allocator) = a->allocator != NULL ? a->allocator : pfx(_default_allocator);
+    ARRAY__ALLOC_PROTOTYPE(*allocator) = a->allocator ? a->allocator : pfx(_default_allocator);
 
     TYPE *new_ptr = NULL;
-    new_ptr = allocator(a->items, sizeof(TYPE) * (size_t)new_size, alignof(TYPE), a->allocator_userdata);
+    new_ptr = (TYPE*)allocator(a->items, sizeof(TYPE) * (size_t)new_size, alignof(TYPE), a->allocator_userdata);
     if (new_ptr == NULL) { return -1; }
 
     a->size = new_size;
@@ -179,6 +174,5 @@ static ARRAY__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
 #undef Array
 #undef ARRAY__TYPE
 #undef ARRAY__NAMESPACE
-#undef ARRAY__ENABLE_COMPARISONS
 #undef ARRAY__TOKCAT_
 #undef ARRAY__TOKCAT

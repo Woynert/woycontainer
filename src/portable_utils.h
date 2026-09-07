@@ -7,6 +7,7 @@
 #include "limits.h"
 #include "math.h"
 #include <stdint.h>
+#include "assert.h"
 
 typedef int64_t i64;
 
@@ -66,7 +67,8 @@ static inline int int_max(int a, int b)                                 { return
 static inline long long long_long_max(long long a, long long b)         { return a > b ? a : b; }
 static inline int int_min(int a, int b)                                 { return a < b ? a : b; }
 static inline int int_clamp(int min, int max, int value)                { return int_max(min, int_min(max, value)); }
-static inline int int_sign(int x) { return (x > 0) - (x < 0); }
+static inline int int_sign(int x) { return (x > 0) - (x < 0); } // Returns -1 or 1.
+static inline float float_sign(float x) { return (float)((x > 0.0) - (x < 0.0)); } // Returns -1 or 1.
 static inline float float_clamp(float min, float max, float value)      { return fmaxf(min, fminf(max, value)); }
 static inline bool int_in_range_inclusive(int min, int max, int value)  { return value >= min && value <= max; }
 
@@ -97,6 +99,12 @@ static int int_digit_places (int n) {
 #define ANSI_BLU "\033[34m"
 #define ANSI_MAG "\033[35m"
 #define ANSI_CYA "\033[36m"
+
+#ifdef DEBUG
+    #define DEBUG_ASSERT wassert
+#else
+    #define DEBUG_ASSERT(...)
+#endif
 
 #define wassert(value) \
     do { \

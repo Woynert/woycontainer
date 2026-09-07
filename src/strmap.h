@@ -65,7 +65,7 @@ typedef struct STRMAP__PRI(Bucket) {
 
 typedef struct Strmap {
     pri(Bucket_Array) buckets;
-    Strpool strpool;
+    Strpool strpool;             // aka keys.
     int pair_count;
 
     STRMAP__ALLOC_PROTOTYPE(*allocator);
@@ -80,10 +80,23 @@ typedef struct pub(It) {
 } pub(It);
 
 
-int pub(upsert)(Strmap *m, strview_t key, STRMAP__TYPE value);
+int                  pub(upsert)               (Strmap *m, strview_t key, STRMAP__TYPE value);
+int                  pub(create_with_allocator)(Strmap *m, STRMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
+int                  pub(create)               (Strmap *m);
+void                 pub(free)                 (Strmap *m);
+void                 pub(clear)                (Strmap *m);
+int                  pub(upsert)               (Strmap *m, strview_t key, STRMAP__TYPE value);
+static STRMAP__TYPE *pub(get)                  (Strmap *m, strview_t key);
+static int           pub(remove)               (Strmap *m, strview_t key);
+bool                 pub(it_next)              (const Strmap *m, pub(It) *it);
+size_t               pub(report_memory)        (Strmap *m);
 
-
-static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, int strpool_key, STRMAP__TYPE value);
+int                        pri(grow)                   (Strmap *m, int new_size);
+int                        pri(init)                   (Strmap *m, STRMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
+static inline int          pri(hash_and_get_bucket_id) (Strmap *m, strview_t key);
+static inline pri(Bucket)* pri(hash_and_get_bucket)    (Strmap *m, strview_t key);
+void                       pri(rehash_if_needed)       (Strmap *old_m);
+static inline int          pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, int strpool_key, STRMAP__TYPE value);
 
 
 int pri(grow)(Strmap *m, int new_size) {
@@ -137,6 +150,16 @@ void pub(free)(Strmap *m) {
 }
 
 
+void pub(clear)(Strmap *m) {
+    for (int i = 0; i < m->buckets.size; ++i) {
+        pri(Bucket) *bucket = &m->buckets.items[i];
+        pri(Pair_da_clear_preserving)(&bucket->pairs);
+    }
+    strpool_clear(&m->strpool);
+    m->pair_count = 0;
+}
+
+
 #ifndef STRMAP__UTILS
 #define STRMAP__UTILS
 uint64_t strmap__hash(strview_t view) {
@@ -151,10 +174,15 @@ uint64_t strmap__hash(strview_t view) {
 #endif
 
 
-static inline pri(Bucket) *pri(hash_and_get_bucket)(Strmap *m, strview_t key) {
+static inline int pri(hash_and_get_bucket_id)(Strmap *m, strview_t key) {
     uint64_t hash = strmap__hash(key);
-    int bucket_id = (int)(hash & (uint64_t)(m->buckets.size - 1));
-    return &m->buckets.items[bucket_id];
+    return (int)(hash & (uint64_t)(m->buckets.size - 1));
+}
+
+
+/// @Note. Cannot fail.
+static inline pri(Bucket) *pri(hash_and_get_bucket)(Strmap *m, strview_t key) {
+    return &m->buckets.items[pri(hash_and_get_bucket_id)(m, key)];
 }
 
 
@@ -205,6 +233,8 @@ void pri(rehash_if_needed)(Strmap *old_m) {
         Strpool bk = new_m->strpool;
         new_m->strpool = old_m->strpool;
         old_m->strpool = bk;
+        // Note: We did just allocate a new strpool to then free it
+        //       We'll keep the old one.
     }
 
     // Free old map.
@@ -248,17 +278,12 @@ int pub(upsert)(Strmap *m, strview_t key, STRMAP__TYPE value) {
     // Register new string key.
 
     int strpool_key_id = strpool_append(&m->strpool, key);
-    if (strpool_key_id < 0) {
-        return -1;
-    }
+    if (strpool_key_id < 0) { return -1; }
 
     // Set pair.
 
     int err = pri(set_pair_with_final_key)(m, bucket, strpool_key_id, value);
-    if (err != 0) {
-        strpool_remove(&m->strpool, strpool_key_id);
-        return -1;
-    }
+    if (err) { strpool_remove(&m->strpool, strpool_key_id); }
 
     return err;
 }
@@ -319,7 +344,7 @@ static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, i
 /// @Note. Modifying the map while iterating is UB.
 bool pub(it_next)(const Strmap *m, pub(It) *it) {
     for (; it->__bucket_id < m->buckets.size; ++it->__bucket_id, it->__pair_id = 0) {
-        for (; it->__pair_id < m->buckets.items[it->__bucket_id].pairs.size;) {
+        while (it->__pair_id < m->buckets.items[it->__bucket_id].pairs.size) {
             int key_str_id = m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].key;
             it->value = &m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].value;
             it->key = strpool_get(&m->strpool, key_str_id);

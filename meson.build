@@ -50,6 +50,9 @@ if not meson.is_subproject()
   strmap_test = executable('strmap_test', './src/strmap_test.c')
   test('strmap_test', strmap_test)
 
+  umapstr_test = executable('umapstr_test', './src/umapstr_test.c')
+  test('umapstr_test', umapstr_test)
+
   npmap0_test = executable('npmap0_test', './src/hashmaps/npmap0_test.c')
   test('npmap0_test', npmap0_test)
 

@@ -15,3 +15,6 @@ compile:
 
 test:
 	meson test --interactive -C build
+
+# To run a single test: meson test --interactive -C build umapstr_test
+

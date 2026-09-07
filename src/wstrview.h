@@ -47,4 +47,6 @@ bool wstrview_equals(strview_t str1, strview_t str2) {
     // !str1.size is necessary see https://nullprogram.com/blog/2025/01/19/#strings
 }
 
+bool wstrview_is_valid(strview_t str) { return !!str.data && str.size >= 0; }
+
 #endif
