@@ -105,7 +105,7 @@ typedef struct {
     pri(Arr_Int) prev;
     pri(Arr_Int) bucket_next;
     pri(Arr_Int) bucket_prev;
-    pri(Arr_Int) bucket_tail;
+    //pri(Arr_Int) bucket_tail;
     pri(Vec_Value) values;
     int capacity_exp;
     int bucket_count_exp;
@@ -141,7 +141,7 @@ void pri(init)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userd
     m->bucket_next = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
     m->bucket_prev = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
     m->val_ids     = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
-    m->bucket_tail = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
+    //m->bucket_tail = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
     m->values      = pri(Vec_Value_create_with_allocator)(allocator, allocator_userdata);
 }
 
@@ -166,7 +166,7 @@ void pub(free)(WMap *m) {
     pri(Arr_Int_destroy)(&m->bucket_next);
     pri(Arr_Int_destroy)(&m->bucket_prev);
     pri(Arr_Int_destroy)(&m->val_ids);
-    pri(Arr_Int_destroy)(&m->bucket_tail);
+    //pri(Arr_Int_destroy)(&m->bucket_tail);
     pri(Vec_Value_free)(&m->values);
     *m = (WMap) { 0 };
 }
@@ -192,9 +192,9 @@ int pri(allocate_direct_storage)(WMap *m, int cap_exp) {
     if (pri(Arr_Int_resize)(&m->bucket_prev, size))   { return -1; }
     if (pri(Arr_Int_resize)(&m->val_ids, size))       { return -1; }
     if (pri(Arr_Int_resize)(&m->val_ids, size))       { return -1; }
-    if (pri(Arr_Int_resize)(&m->bucket_tail, size)){ return -1; }
+    //if (pri(Arr_Int_resize)(&m->bucket_tail, size)){ return -1; }
     pri(clear)(m, 0, size);
-    memset(m->bucket_tail.items, 0, sizeof(m->bucket_tail.items[0]) * (size_t)(size));
+    //memset(m->bucket_tail.items, 0, sizeof(m->bucket_tail.items[0]) * (size_t)(size));
     m->capacity_exp = cap_exp;
     return 0;
 }
@@ -297,7 +297,7 @@ static inline int pri(set_new_pair)(WMap *m, ID i_bucket_prev, ID i_new, KEY key
     m->last_node = i_new;
     ++m->pair_count;
     // ↓↓ Setting limits for current bucket.
-    m->bucket_tail.items[ID_get(bucket_id)] = i_new;
+    //m->bucket_tail.items[ID_get(bucket_id)] = i_new;
     //
     return 0;
 }
@@ -355,8 +355,54 @@ int pub(upsert)(WMap *m, KEY key, TYPE item) {
     return 0;
 }
 
+void pri(swap_nodes_same_bucket)(WMap *m, const ID a, const ID b, ID bucket) {
+    if (ID_equals(a, b)) { return; }
 
-void pri(swap_nodes)(WMap *m, ID a, ID b, ID a_bucket, ID b_bucket) {
+    ID a_prev_init_ = m->prev.items[ID_get(a)];
+    ID b_prev_init_ = m->prev.items[ID_get(b)];
+    ID a_next_init_ = m->next.items[ID_get(a)];
+    ID b_next_init_ = m->next.items[ID_get(b)];
+    {
+        SWAP(m->next.items[ID_get(a)], m->next.items[ID_get(b)]);
+        ID a_init = a;
+        ID b_init = b;
+
+        ID a_prev_init = m->prev.items[ID_get(a)];
+        ID b_prev_init = m->prev.items[ID_get(b)];
+
+        ID a_final = b;
+        ID b_final = a;
+
+        ID a_prev = ID_equals(a_prev_init, b_init) ? b_final : a_prev_init;
+        ID b_prev = ID_equals(b_prev_init, a_init) ? a_final : b_prev_init;
+        printfd("(%d) prev is %d. So (%d)->(%d)", ID_get(a), ID_get(a_prev), ID_get(a_prev), ID_get(a_final));
+        printfd("(%d) prev is %d. So (%d)->(%d)", ID_get(b), ID_get(b_prev), ID_get(b_prev), ID_get(b_final));
+
+        if (ID_valid(a_prev)) { m->next.items[ID_get(a_prev)] = a_final; }
+        else { m->first_node = a_final; } // Must be root.
+        if (ID_valid(b_prev)) { m->next.items[ID_get(b_prev)] = b_final; }
+        else { m->first_node = b_final; } // Must be root.
+    }
+
+    {
+        SWAP(m->prev.items[ID_get(a)], m->prev.items[ID_get(b)]);
+
+        ID a_prev = ID_equals(a_next_init_, b) ? a : a_next_init_;
+        ID b_prev = ID_equals(b_next_init_, a) ? b : b_next_init_;
+        printfd("(%d) next is %d. So (%d)->(%d)", ID_get(a), ID_get(a_prev), ID_get(a_prev), ID_get(b));
+        printfd("(%d) next is %d. So (%d)->(%d)", ID_get(b), ID_get(b_prev), ID_get(b_prev), ID_get(a));
+
+        if (ID_valid(a_prev)) { m->prev.items[ID_get(a_prev)] = b; }
+        else { m->last_node = b; } // Must be tail
+        if (ID_valid(b_prev)) { m->prev.items[ID_get(b_prev)] = a; }
+        else { m->last_node = a; } // Must be tail
+    }
+
+    SWAP(m->keys.items[ID_get(a)], m->keys.items[ID_get(b)]);
+    SWAP(m->val_ids.items[ID_get(a)], m->val_ids.items[ID_get(b)]);
+}
+
+void pri(swap_nodes_diff_bucket)(WMap *m, ID a, ID b, ID a_bucket, ID b_bucket) {
     if (ID_equals(a, b)) { return; }
     // Note: Must never try to swap root nodes.
     //       aka. both nodes must have a bucket_previous.
@@ -364,59 +410,54 @@ void pri(swap_nodes)(WMap *m, ID a, ID b, ID a_bucket, ID b_bucket) {
     wassert(ID_valid(m->bucket_prev.items[ID_get(b)]));
     SWAP(m->keys.items[ID_get(a)], m->keys.items[ID_get(b)]);
     SWAP(m->val_ids.items[ID_get(a)], m->val_ids.items[ID_get(b)]);
-    //SWAP(m->next.items[ID_get(a)], m->next.items[ID_get(b)]);
-    //SWAP(m->prev.items[ID_get(a)], m->prev.items[ID_get(b)]);
-    ID a_next = m->bucket_next.items[ID_get(a)];
-    ID b_next = m->bucket_next.items[ID_get(b)];
-    ID a_prev = m->bucket_prev.items[ID_get(a)];
-    ID b_prev = m->bucket_prev.items[ID_get(b)];
 
-    //SWAP(m->bucket_next.items[ID_get(m->bucket_prev.items[ID_get(a)])], m->bucket_next.items[ID_get(m->bucket_prev.items[ID_get(b)])]);
-    //SWAP(m->bucket_prev.items[ID_get(m->bucket_prev.items[ID_get(a)])], m->bucket_prev.items[ID_get(m->bucket_prev.items[ID_get(b)])]);
+    const ID a_next_init = m->next.items[ID_get(a)];
+    const ID b_next_init = m->next.items[ID_get(b)];
+    const ID a_prev_init = m->prev.items[ID_get(a)];
+    const ID b_prev_init = m->prev.items[ID_get(b)];
+    const ID a_bu_next_init = m->bucket_next.items[ID_get(a)];
+    const ID b_bu_next_init = m->bucket_next.items[ID_get(b)];
+    const ID a_bu_prev_init = m->bucket_prev.items[ID_get(a)];
+    const ID b_bu_prev_init = m->bucket_prev.items[ID_get(b)];
 
-    //if (ID_valid(m->bucket_next.items[ID_get(a)]) || ID_valid(m->bucket_next.items[ID_get(b)]))
-    //{ SWAP(m->bucket_prev.items[ID_get(m->bucket_next.items[ID_get(a)])], m->bucket_prev.items[ID_get(m->bucket_next.items[ID_get(b)])]); }
-    //if (ID_valid(a_next)) {
-        //m->bucket_prev.items[ID_get(a_next)] = b;
-    //} else { // This means this is the tail.
-        //m->bucket_tail.items[ID_get(a_bucket)] = b;
-    //}
-
-    if (ID_valid(a_next)) { m->bucket_prev.items[ID_get(a_next)] = b; }
-    else { m->bucket_tail.items[ID_get(a_bucket)] = b; }
-    // ↑↑↑ Else this means this is the tail.
-
-    if (ID_valid(b_next)) { m->bucket_prev.items[ID_get(b_next)] = a; }
-    else { m->bucket_tail.items[ID_get(b_bucket)] = a; }
-    // ↑↑↑ Else this means this is the tail.
-
-    //if (ID_valid(b_next)) { m->bucket_prev.items[ID_get(b_next)] = a; }
-
-    SWAP(m->bucket_next.items[ID_get(a_prev)], m->bucket_next.items[ID_get(b_prev)]);
-    //SWAP(m->bucket_prev.items[ID_get(a_prev)], m->bucket_prev.items[ID_get(b_prev)]);
-
-    //m->bucket_next.items[ID_get(a)] = b_next;
-    //m->bucket_next.items[ID_get(b)] = a_next;
-    //m->bucket_prev.items[ID_get(a)] = b_prev;
-    //m->bucket_prev.items[ID_get(b)] = a_prev;
-    SWAP(m->bucket_next.items[ID_get(a)], m->bucket_next.items[ID_get(b)]);
-    SWAP(m->bucket_prev.items[ID_get(a)], m->bucket_prev.items[ID_get(b)]);
     {
-        //if (ID_valid(i_bucket_prev)) {
-            //ID next = m->bucket_next.items[ID_get(i)];
-            //m->bucket_next.items[ID_get(i_bucket_prev)] = ID_valid(next) ? next : ID_INVALID;
-        //}
+        SWAP(m->prev.items[ID_get(a)], m->prev.items[ID_get(b)]);
+        ID a_next = ID_equals(a_next_init, b) ? a : a_next_init;
+        ID b_next = ID_equals(b_next_init, a) ? b : b_next_init;
+        if (ID_valid(a_next)) { m->prev.items[ID_get(a_next)] = b; }
+        else { m->last_node = b; } // Must be tail
+        if (ID_valid(b_next)) { m->prev.items[ID_get(b_next)] = a; }
+        else { m->last_node = a; } // Must be tail
     }
-    //m->bucket_next.items[xxx]; // ???
-    /*
-    pri(Arr_Key) keys;
-    pri(Arr_Int) val_ids;
-    pri(Arr_Int) next;
-    pri(Arr_Int) prev;
-    pri(Arr_Int) bucket_next;
-    pri(Arr_Pair) bucket_limits;
-    pri(Vec_Value) values;
-       */
+    {
+        SWAP(m->next.items[ID_get(a)], m->next.items[ID_get(b)]);
+        ID a_prev = ID_equals(a_prev_init, b) ? a : a_prev_init;
+        ID b_prev = ID_equals(b_prev_init, a) ? b : b_prev_init;
+        if (ID_valid(a_prev)) { m->next.items[ID_get(a_prev)] = b; }
+        else { m->first_node = b; } // Must be root
+        if (ID_valid(b_prev)) { m->next.items[ID_get(b_prev)] = a; }
+        else { m->first_node = a; } // Must be root
+    }
+
+    {
+        SWAP(m->bucket_prev.items[ID_get(a)], m->bucket_prev.items[ID_get(b)]);
+        ID a_prev = ID_equals(a_bu_next_init, b) ? a : a_bu_next_init;
+        ID b_prev = ID_equals(b_bu_next_init, a) ? b : b_bu_next_init;
+        if (ID_valid(a_prev)) { m->bucket_prev.items[ID_get(a_prev)] = b; }
+        if (ID_valid(b_prev)) { m->bucket_prev.items[ID_get(b_prev)] = a; }
+        // It's okay to not have a bucket_next.
+    }
+    {
+        SWAP(m->bucket_next.items[ID_get(a)], m->bucket_next.items[ID_get(b)]);
+        ID a_prev = ID_equals(a_bu_prev_init, b) ? a : a_bu_prev_init;
+        ID b_prev = ID_equals(b_bu_prev_init, a) ? b : b_bu_prev_init;
+        if (ID_valid(a_prev)) { m->bucket_next.items[ID_get(a_prev)] = b; }
+        else { printferr("wtf: Trying to swap root."); }
+        // Else this node must be root. Note: Can't touch the root, shouldn't be swapping in the first place.
+        if (ID_valid(b_prev)) { m->bucket_next.items[ID_get(b_prev)] = a; }
+        else { printferr("wtf: Trying to swap root."); }
+        // Else this node must be root. Note: Can't touch the root, shouldn't be swapping in the first place.
+    }
 }
 
 int pub(remove)(WMap *m, KEY key) {
@@ -454,15 +495,15 @@ int pub(remove)(WMap *m, KEY key) {
         // Note: The root of a bucket is always equal to it's ID...
         // bucket_beg == bucket_id <-- ALWAYS TRUE
         ID bucket_beg = bucket_id;
-        ID bucket_end = m->bucket_tail.items[ID_get(bucket_id)];
+        //ID bucket_end = m->bucket_tail.items[ID_get(bucket_id)];
         if (ID_equals(bucket_beg, i)) {
             // Here is when we need to do some smarter swapping.
             ID bucket_next = m->bucket_next.items[ID_get(bucket_id)];
-            pri(swap_nodes)(m, bucket_beg, ID_valid(bucket_next) ? bucket_next : ID_INVALID, bucket_id, bucket_id);
+            //pri(swap_nodes)(m, bucket_beg, ID_valid(bucket_next) ? bucket_next : ID_INVALID, bucket_id, bucket_id);
         }
-        if (ID_equals(bucket_end, i)) {
-            ID bucket_next = m->bucket_next.items[ID_get(bucket_id)];
-        }
+        //if (ID_equals(bucket_end, i)) {
+            //ID bucket_next = m->bucket_next.items[ID_get(bucket_id)];
+        //}
     }
     {
         // Buckets:
@@ -553,10 +594,33 @@ void pub(print)(const WMap *m) {
         printf("%5d|", ID_get(m->prev.items[i]));
         if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
     }
-    printf("\nbuk_limt:");
-    for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
-        printf("%2d,%2d|", i, ID_get(m->bucket_tail.items[i]));
-        if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
+    //printf("\nbuk_limt:");
+    //for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
+        //printf("%2d,%2d|", i, ID_get(m->bucket_tail.items[i]));
+        //if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
+    //}
+    printf("\n");
+}
+
+void pub(print_order)(const WMap *m, bool backwards) {
+    const int MAX_CYCLES = 100;
+    int cycles = 0;
+    ID node = m->first_node;
+    printf("Order Forward:\n");
+    while(ID_valid(node)) {
+        printf("%d,", m->keys.items[ID_get(node)]);
+        node = m->next.items[ID_get(node)];
+        if (++cycles > MAX_CYCLES) { printf("\n"); return; }
+    }
+    printf("\n");
+    if (!backwards) { return; }
+    cycles = 0;
+    printf("Order Backwards:\n");
+    node = m->last_node;
+    while(ID_valid(node)) {
+        printf("%d,", m->keys.items[ID_get(node)]);
+        node = m->prev.items[ID_get(node)];
+        if (++cycles > MAX_CYCLES) { printf("\n"); return; }
     }
     printf("\n");
 }
@@ -576,19 +640,20 @@ void pub(print_bucket_chains)(const WMap *m, bool backwards) {
         }
         printf("\n");
     }
-    if (!backwards) { return; }
-    cycles = 0;
-    printf("Backwards:\n");
-    for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
-        ID id = m->bucket_tail.items[i];
-        while (ID_valid(id)) {
-            printf("%d,", m->keys.items[ID_get(id)]);
-            id = m->bucket_prev.items[ID_get(id)];
+    (void)backwards;
+    //if (!backwards) { return; }
+    //cycles = 0;
+    //printf("Backwards:\n");
+    //for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
+        //ID id = m->bucket_tail.items[i];
+        //while (ID_valid(id)) {
+            //printf("%d,", m->keys.items[ID_get(id)]);
+            //id = m->bucket_prev.items[ID_get(id)];
 
-            if (++cycles > max_cycles) { return; }
-        }
-        printf("\n");
-    }
+            //if (++cycles > max_cycles) { return; }
+        //}
+        //printf("\n");
+    //}
 }
 
 /*

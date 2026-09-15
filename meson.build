@@ -74,5 +74,8 @@ if not meson.is_subproject()
   hm_benchmarks_test = executable('hm_benchmarks_test', './src/hashmaps/hm_benchmarks_test.c')
   test('hm_benchmarks_test', hm_benchmarks_test)
 
+  wmap_test = executable('wmap_test', './src/wmap_test.c')
+  test('wmap_test', wmap_test)
+
 endif
 
