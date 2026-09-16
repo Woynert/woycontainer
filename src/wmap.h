@@ -83,9 +83,12 @@ inline bool        wmap__zid_valid(wmap__zid_t id)         { return id.id > 0; }
 #define ARRAY__TYPE ID
 #define ARRAY__NAMESPACE WMAP__PRI(Arr_Int)
 #include "array.h"
-#define DYNA__TYPE WMAP__TYPE
-#define DYNA__NAMESPACE WMAP__PRI(Vec_Value)
-#include "da.h"
+//#define DYNA__TYPE WMAP__TYPE
+//#define DYNA__NAMESPACE WMAP__PRI(Vec_Value)
+//#include "da.h"
+#define SLOT__TYPE WMAP__TYPE
+#define SLOT__NAMESPACE WMAP__PRI(Slot_Value)
+#include "slot.h"
 
 #define pub WMAP__PFX
 #define pri WMAP__PRI
@@ -106,7 +109,8 @@ typedef struct {
     pri(Arr_Int) bucket_next;
     pri(Arr_Int) bucket_prev;
     //pri(Arr_Int) bucket_tail;
-    pri(Vec_Value) values;
+    //pri(Vec_Value) values;
+    pri(Slot_Value) values;
     int capacity_exp;
     int bucket_count_exp;
 
@@ -141,8 +145,7 @@ void pri(init)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userd
     m->bucket_next = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
     m->bucket_prev = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
     m->val_ids     = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
-    //m->bucket_tail = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
-    m->values      = pri(Vec_Value_create_with_allocator)(allocator, allocator_userdata);
+    pri(Slot_Value_create_with_allocator)(&m->values, allocator, allocator_userdata);
 }
 
 /// @Returns error.
@@ -166,8 +169,7 @@ void pub(free)(WMap *m) {
     pri(Arr_Int_destroy)(&m->bucket_next);
     pri(Arr_Int_destroy)(&m->bucket_prev);
     pri(Arr_Int_destroy)(&m->val_ids);
-    //pri(Arr_Int_destroy)(&m->bucket_tail);
-    pri(Vec_Value_free)(&m->values);
+    pri(Slot_Value_free)(&m->values);
     *m = (WMap) { 0 };
 }
 
@@ -226,7 +228,7 @@ static inline int pri(hash_and_get_bucket)(WMap *m, KEY key) {
 bool pub(it_next)(const WMap *m, pub(It) *it);
 
 int pri(find)(WMap *m, ID start, KEY key, ID *out_prev_id, ID *out_id);
-static inline int pri(set_new_pair)(WMap *m, ID node_prev, ID node_new, KEY key, ID value_id, ID bucket_id);
+static inline int pri(set_new_pair)(WMap *m, ID node_prev, ID node_new, KEY key, ID value_id);
 
 int pri(rehash_if_needed)(WMap *old_m) {
     const float factor = (float)old_m->pair_count / (float)(1 << old_m->bucket_count_exp);
@@ -258,12 +260,12 @@ int pri(rehash_if_needed)(WMap *old_m) {
             err = pri(grow_collision_storage)(new_m, new_m->capacity_exp + 1);
             if (err) { printferr("No memory?"); goto quit_abort; }
         }
-        pri(set_new_pair)(new_m, i_prev, i, it.key, it.__value_id, bucket_id);
+        pri(set_new_pair)(new_m, i_prev, i, it.key, it.__value_id);
         if (ID_get(i) >= (1 << new_m->bucket_count_exp)) { ++new_m->collision_count; }
     }
 
     // Swap data and free.
-    pri(Vec_Value) bk = new_m->values;
+    pri(Slot_Value) bk = new_m->values;
     new_m->values = old_m->values;
     old_m->values = bk;
     pub(free)(old_m);
@@ -281,7 +283,7 @@ int pri(rehash_if_needed)(WMap *old_m) {
 /// @Param. i_prev. Can be invalid.
 /// @Param. i_new. Must exist.
 /// @Note. Can't fail.
-static inline int pri(set_new_pair)(WMap *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id, ID bucket_id) {
+static inline int pri(set_new_pair)(WMap *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id) {
     if (m->pair_count == 0) { m->first_node = i_new; }
     if (ID_valid(i_bucket_prev)) {
         m->bucket_next.items[ID_get(i_bucket_prev)] = i_new;
@@ -338,7 +340,9 @@ int pub(upsert)(WMap *m, KEY key, TYPE item) {
     ID i = bucket_id;
     bool found = 0 == pri(find)(m, i, key, &i_prev, &i);
     if (found) {
-        m->values.items[ID_get(m->val_ids.items[ID_get(i)])] = item; // Update.
+        // Update.
+        pri(Slot_Value_update)(&m->values, ID_get(m->val_ids.items[ID_get(i)]), item);
+        //m->values.items[ID_get(m->val_ids.items[ID_get(i)])] = item; // Update.
         printfd("Updated");
         return 0;
     }
@@ -347,62 +351,59 @@ int pub(upsert)(WMap *m, KEY key, TYPE item) {
         int err = pri(grow_collision_storage)(m, m->capacity_exp + 1);
         if (err) { return -1; }
     }
-    ID value_id = ID_make(pri(Vec_Value_append)(&m->values, item));
+    //ID value_id = ID_make(pri(Vec_Value_append)(&m->values, item));
+    ID value_id = ID_make(pri(Slot_Value_append)(&m->values, item));
     if (!ID_valid(value_id)) { return -1; }
-    pri(set_new_pair)(m, i_prev, i, key, value_id, bucket_id);
+    pri(set_new_pair)(m, i_prev, i, key, value_id);
     if (ID_get(i) >= (1 << m->bucket_count_exp)) { ++m->collision_count; }
     //if (pri(rehash_if_needed)(m)) { printferr("W: Rehashing failed."); }
     return 0;
 }
 
-void pri(swap_nodes_same_bucket)(WMap *m, const ID a, const ID b, ID bucket) {
+void pri(swap_nodes_same_bucket)(WMap *m, const ID a, const ID b) {
     if (ID_equals(a, b)) { return; }
 
     ID a_prev_init_ = m->prev.items[ID_get(a)];
     ID b_prev_init_ = m->prev.items[ID_get(b)];
     ID a_next_init_ = m->next.items[ID_get(a)];
     ID b_next_init_ = m->next.items[ID_get(b)];
+
     {
         SWAP(m->next.items[ID_get(a)], m->next.items[ID_get(b)]);
-        ID a_init = a;
-        ID b_init = b;
-
-        ID a_prev_init = m->prev.items[ID_get(a)];
-        ID b_prev_init = m->prev.items[ID_get(b)];
-
-        ID a_final = b;
-        ID b_final = a;
-
-        ID a_prev = ID_equals(a_prev_init, b_init) ? b_final : a_prev_init;
-        ID b_prev = ID_equals(b_prev_init, a_init) ? a_final : b_prev_init;
-        printfd("(%d) prev is %d. So (%d)->(%d)", ID_get(a), ID_get(a_prev), ID_get(a_prev), ID_get(a_final));
-        printfd("(%d) prev is %d. So (%d)->(%d)", ID_get(b), ID_get(b_prev), ID_get(b_prev), ID_get(b_final));
-
-        if (ID_valid(a_prev)) { m->next.items[ID_get(a_prev)] = a_final; }
-        else { m->first_node = a_final; } // Must be root.
-        if (ID_valid(b_prev)) { m->next.items[ID_get(b_prev)] = b_final; }
-        else { m->first_node = b_final; } // Must be root.
+        ID a_prev = ID_equals(a_prev_init_, b) ? a : a_prev_init_;
+        ID b_prev = ID_equals(b_prev_init_, a) ? b : b_prev_init_;
+        if (ID_valid(a_prev)) { m->next.items[ID_get(a_prev)] = b; }
+        else { m->first_node = b; } // Must be root.
+        if (ID_valid(b_prev)) { m->next.items[ID_get(b_prev)] = a; }
+        else { m->first_node = a; } // Must be root.
     }
 
     {
         SWAP(m->prev.items[ID_get(a)], m->prev.items[ID_get(b)]);
-
-        ID a_prev = ID_equals(a_next_init_, b) ? a : a_next_init_;
-        ID b_prev = ID_equals(b_next_init_, a) ? b : b_next_init_;
-        printfd("(%d) next is %d. So (%d)->(%d)", ID_get(a), ID_get(a_prev), ID_get(a_prev), ID_get(b));
-        printfd("(%d) next is %d. So (%d)->(%d)", ID_get(b), ID_get(b_prev), ID_get(b_prev), ID_get(a));
-
-        if (ID_valid(a_prev)) { m->prev.items[ID_get(a_prev)] = b; }
-        else { m->last_node = b; } // Must be tail
-        if (ID_valid(b_prev)) { m->prev.items[ID_get(b_prev)] = a; }
-        else { m->last_node = a; } // Must be tail
+        ID a_next = ID_equals(a_next_init_, b) ? a : a_next_init_;
+        ID b_next = ID_equals(b_next_init_, a) ? b : b_next_init_;
+        if (ID_valid(a_next)) { m->prev.items[ID_get(a_next)] = b; }
+        else { m->last_node = b; } // Must be tail.
+        if (ID_valid(b_next)) { m->prev.items[ID_get(b_next)] = a; }
+        else { m->last_node = a; } // Must be tail.
     }
 
     SWAP(m->keys.items[ID_get(a)], m->keys.items[ID_get(b)]);
     SWAP(m->val_ids.items[ID_get(a)], m->val_ids.items[ID_get(b)]);
+
+    // Keeping this here since it explains the swap logic:
+    //     SWAP(m->next.items[ID_get(a_init)], m->next.items[ID_get(b_init)]);
+    //     ID a_final = b_init;
+    //     ID b_final = a_init;
+    //     ID a_prev = ID_equals(a_prev_init, b_init) ? b_final : a_prev_init;
+    //     ID b_prev = ID_equals(b_prev_init, a_init) ? a_final : b_prev_init;
+    //     if (ID_valid(a_prev)) { m->next.items[ID_get(a_prev)] = a_final; }
+    //     else { m->first_node = a_final; } // Must be root.
+    //     if (ID_valid(b_prev)) { m->next.items[ID_get(b_prev)] = b_final; }
+    //     else { m->first_node = b_final; } // Must be root.
 }
 
-void pri(swap_nodes_diff_bucket)(WMap *m, ID a, ID b, ID a_bucket, ID b_bucket) {
+void pri(swap_nodes_diff_bucket)(WMap *m, ID a, ID b) {
     if (ID_equals(a, b)) { return; }
     // Note: Must never try to swap root nodes.
     //       aka. both nodes must have a bucket_previous.
@@ -453,10 +454,10 @@ void pri(swap_nodes_diff_bucket)(WMap *m, ID a, ID b, ID a_bucket, ID b_bucket) 
         ID b_prev = ID_equals(b_bu_prev_init, a) ? b : b_bu_prev_init;
         if (ID_valid(a_prev)) { m->bucket_next.items[ID_get(a_prev)] = b; }
         else { printferr("wtf: Trying to swap root."); }
-        // Else this node must be root. Note: Can't touch the root, shouldn't be swapping in the first place.
         if (ID_valid(b_prev)) { m->bucket_next.items[ID_get(b_prev)] = a; }
         else { printferr("wtf: Trying to swap root."); }
-        // Else this node must be root. Note: Can't touch the root, shouldn't be swapping in the first place.
+        // If invalid this node must be root.
+        // Note: Can't touch the root, shouldn't be swapping in the first place.
     }
 }
 
@@ -467,76 +468,42 @@ int pub(remove)(WMap *m, KEY key) {
     bool found = 0 == pri(find)(m, i, key, &i_bucket_prev, &i);
     if (!found) { return 0; }
 
+    // 1. If 'in direct' and has bucket_next -> Swap node to next in it's bucket.
+    if (ID_get(i) < (1 << m->bucket_count_exp) && ID_valid(m->bucket_next.items[ID_get(i)])) {
+        pri(swap_nodes_same_bucket)(m, i, m->bucket_next.items[ID_get(i)]);
+        i = m->bucket_next.items[ID_get(i)];
+    }
+    // 2. If not 'in direct' -> Swap node to vector end.
+    if (ID_get(i) >= (1 << m->bucket_count_exp)) {
+        ID end = ID_make((1 << m->bucket_count_exp) + m->collision_count-1);
+        pri(swap_nodes_diff_bucket)(m, i, end);
+        i = end;
+        --m->collision_count;
+    }
+    // 3. Pop.
     {
-        // Order:
-        // From: Prev -> Me -> Next.
-        // To:   Prev -------> Next.
+        // Update indices for Order:
         ID prev = m->prev.items[ID_get(i)];
         ID next = m->next.items[ID_get(i)];
-        if (ID_valid(prev)) {
-            m->next.items[ID_get(prev)] = ID_valid(next) ? next : ID_INVALID;
-        }
-        // Order:
-        // From: [Root] -> Me -> Next.
-        // To:   [Root] -------> Next.
-        if (ID_equals(m->first_node, i)) {
-            m->first_node = ID_valid(next) ? next : ID_INVALID;
-        }
-        // Order:
-        // From: Prev -> Me -> [End].
-        // To:   Prev -------> [End].
-        if (ID_equals(m->last_node, i)) {
-            m->last_node = ID_valid(prev) ? prev : ID_INVALID;
-        }
+        if (ID_valid(prev)) { m->next.items[ID_get(prev)] = ID_valid(next) ? next : ID_INVALID; }
+        if (ID_valid(next)) { m->prev.items[ID_get(next)] = ID_valid(prev) ? prev : ID_INVALID; }
+        if (ID_equals(i, m->first_node)) { m->first_node = ID_valid(next) ? next : ID_INVALID; }
+        if (ID_equals(i, m->last_node)) { m->last_node = ID_valid(prev) ? prev : ID_INVALID; }
+        // Update indices for Bucket:
+        prev = m->bucket_prev.items[ID_get(i)];
+        next = m->bucket_next.items[ID_get(i)];
+        if (ID_valid(prev)) { m->bucket_next.items[ID_get(prev)] = ID_valid(next) ? next : ID_INVALID; }
+        if (ID_valid(next)) { m->bucket_prev.items[ID_get(next)] = ID_valid(prev) ? prev : ID_INVALID; }
+        // Cleanup.
+        pri(Slot_Value_pop)(&m->values, ID_get(m->val_ids.items[ID_get(i)]));
+        m->keys.items[ID_get(i)] = 0; // No need to clear the key... But if feels right :(
+        m->val_ids.items[ID_get(i)] = ID_INVALID;
+        m->next.items[ID_get(i)] = ID_INVALID;
+        m->prev.items[ID_get(i)] = ID_INVALID;
+        m->bucket_next.items[ID_get(i)] = ID_INVALID;
+        m->bucket_prev.items[ID_get(i)] = ID_INVALID;
+        --m->pair_count;
     }
-    {
-        // Bucket:
-        // Limits
-        // Note: The root of a bucket is always equal to it's ID...
-        // bucket_beg == bucket_id <-- ALWAYS TRUE
-        ID bucket_beg = bucket_id;
-        //ID bucket_end = m->bucket_tail.items[ID_get(bucket_id)];
-        if (ID_equals(bucket_beg, i)) {
-            // Here is when we need to do some smarter swapping.
-            ID bucket_next = m->bucket_next.items[ID_get(bucket_id)];
-            //pri(swap_nodes)(m, bucket_beg, ID_valid(bucket_next) ? bucket_next : ID_INVALID, bucket_id, bucket_id);
-        }
-        //if (ID_equals(bucket_end, i)) {
-            //ID bucket_next = m->bucket_next.items[ID_get(bucket_id)];
-        //}
-    }
-    {
-        // Buckets:
-        // From: Prev -> Me -> Next.
-        // To:   Prev -------> Next.
-        if (ID_valid(i_bucket_prev)) {
-            ID next = m->bucket_next.items[ID_get(i)];
-            m->bucket_next.items[ID_get(i_bucket_prev)] = ID_valid(next) ? next : ID_INVALID;
-        }
-    }
-
-
-    // Order:
-    // Delete 'Me'
-    //m->keys.items[ID_get(i)] = 0; No need to clear the key.
-    m->val_ids.items[ID_get(i)] = ID_INVALID;
-    m->next.items[ID_get(i)] = ID_INVALID;
-    m->prev.items[ID_get(i)] = ID_INVALID;
-    m->bucket_next.items[ID_get(i)] = ID_INVALID;
-    /*
-    pri(Arr_Key) keys;
-    pri(Arr_Int) val_ids;
-    pri(Arr_Int) next;
-    pri(Arr_Int) prev;
-    pri(Arr_Int) bucket_next;
-    pri(Arr_Pair) bucket_limits;
-    pri(Vec_Value) values;
-       */
-
-
-
-
-
     return 0;
 }
 
@@ -547,7 +514,8 @@ int pub(remove)(WMap *m, KEY key) {
 bool pub(it_next)(const WMap *m, pub(It) *it) {
     while (ID_valid(it->__id)) {
         it->key = m->keys.items[ID_get(it->__id)];
-        it->value = &m->values.items[ID_get(m->val_ids.items[ID_get(it->__id)])];
+        //it->value = &m->values.items[ID_get(m->val_ids.items[ID_get(it->__id)])];
+        it->value = pri(Slot_Value_get)(&m->values, ID_get(m->val_ids.items[ID_get(it->__id)]));
         it->__value_id = m->val_ids.items[ID_get(it->__id)];
         it->__id = m->next.items[ID_get(it->__id)];
         return true;
@@ -581,8 +549,8 @@ void pub(print)(const WMap *m) {
         if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
     }
     printf("\nvalues:  ");
-    for (int i = 0; i < m->values.size; ++i) {
-        printf("[%d]=%d,", i, m->values.items[i]);
+    for (int i = 0; i < m->values.count; ++i) {
+        printf("[%d]=%d,", m->values.itemid_to_userid[i], m->values._items[i]);
     }
     printf("\nnext:    ");
     for (int i = 0; i < 1 << m->capacity_exp; ++i) {
@@ -631,6 +599,8 @@ void pub(print_bucket_chains)(const WMap *m, bool backwards) {
     printf("Forward:\n");
     for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
         ID id = ID_make(i);
+        printf("(bucket %d): ", i);
+        if (!ID_valid(m->val_ids.items[ID_get(id)])) { printf("\n"); continue; }
         while (ID_valid(id)) {
             //printf("%d"ANSI_GRE"(%d)"ANSI_RESET",", ID_get(id), m->keys.items[ID_get(id)]);
             printf("%d,", m->keys.items[ID_get(id)]);

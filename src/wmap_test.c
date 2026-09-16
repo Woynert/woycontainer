@@ -9,6 +9,22 @@
 #define DYNA__NAMESPACE Vec_Int
 #include "da.h"
 
+#define DYNA__TYPE Vec_Int
+#define DYNA__NAMESPACE Vec_Vec_Int
+#include "da.h"
+
+#define MAKEVIEW__TYPE int
+#define MAKEVIEW__NAMESPACE View_Int
+#include "make_view.h"
+
+#define MAKEVIEW__TYPE Vec_Int
+#define MAKEVIEW__NAMESPACE View_Vec_Int
+#include "make_view.h"
+
+#define View_Int_literal(...) (View_Int) {.data = (int[]){ __VA_ARGS__ }, .size=(int)(sizeof((int[]){ __VA_ARGS__ })/sizeof(int)) }
+
+View_Int mimos = { 0 };
+View_Vec_Int globalmi = { 0 };
 
 #define WMAP__KEY int
 #define WMAP__TYPE int
@@ -17,6 +33,15 @@
 #include "wmap.h"
 
 
+/*typedef struct {*/
+    /*const int *data;*/
+    /*int size;*/
+/*} intview_t;*/
+
+/*#define intview_literal(...) (intview_t) {.data = (int[]){ __VA_ARGS__ }, .size=(int)(sizeof((int[]){ __VA_ARGS__ })/sizeof(int)) }*/
+
+
+// Useful ID macros.
 #define ID           wmap__zid_t
 #define ID_valid(id) wmap__zid_valid(id)
 #define ID_get(id)   wmap__zid_get(id)
@@ -25,19 +50,8 @@
 #define ID_INVALID ((ID){0})
 
 
-typedef struct {
-    const int *data;
-    int size;
-} intview_t;
-
-#define intview_literal(...) (intview_t) {.data = (int[]){ __VA_ARGS__ }, .size=(int)(sizeof((int[]){ __VA_ARGS__ })/sizeof(int)) }
-
-
 /// Inclusive
-int rand_range(int from, int to) {
-    /*return (to <= from) ? from : (rand() % (to - from +1)) + from;*/
-    return (rand() % (to - from +1)) + from;
-}
+int rand_range(int from, int to) { return (rand() % (to - from +1)) + from; }
 
 ID force_get_bucket_root(Map_Int *m, ID a) {
     ID found = a;
@@ -50,99 +64,176 @@ ID force_get_bucket_root(Map_Int *m, ID a) {
 }
 
 void swap_nodes(Map_Int *m, ID a, ID b) {
-    printfd("a is %d of root %d", ID_get(a), ID_get(force_get_bucket_root(m, a)));
-    printfd("b is %d of root %d", ID_get(b), ID_get(force_get_bucket_root(m, b)));
-    Map_Int__swap_nodes_diff_bucket(m, a, b, force_get_bucket_root(m, a), force_get_bucket_root(m, b));
+    Map_Int__swap_nodes_diff_bucket(m, a, b);
 }
 
-/*
-   Swaps all nodes of the same bucket and test whether they're still all present.
-   */
-bool shuffle_nodes_same_bucket(Map_Int *m, Arena arena) {
-    intview_t ordered_keys;
+
+bool mimosaisd(void) { return NULL; }
+int jlasf (void) { return (int)mimosaisd(); }
+
+
+
+typedef struct {
+    View_Int ordered_keys;
+    View_Vec_Int bucket_chains;
+} IntegrityTest;
+
+IntegrityTest get_integrity_snapshot(Map_Int *m, Arena *perm) {
+    IntegrityTest integrity = { 0 };
     {
-        Vec_Int order_keys = Vec_Int_create_with_allocator(arena_allocator, &arena);
+        Vec_Int order_keys = Vec_Int_create_with_allocator(arena_allocator, perm);
         ID node = m->first_node;
         while(ID_valid(node)) {
             Vec_Int_append(&order_keys, m->keys.items[ID_get(node)]);
             node = m->next.items[ID_get(node)];
         }
-        ordered_keys = (intview_t){.data = order_keys.items, .size = order_keys.size };
+        integrity.ordered_keys = (View_Int){order_keys.items, order_keys.size};
     }
-    Map_Int_print_order(m, false);
+    {
+        Vec_Vec_Int bucket_chains = Vec_Vec_Int_create_with_allocator(arena_allocator, perm);
+
+        for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
+            Vec_Int *bucket_keys;
+            {
+                Vec_Int keys = Vec_Int_create_with_allocator(arena_allocator, perm);
+                int id = Vec_Vec_Int_append(&bucket_chains, keys);
+                bucket_keys = Vec_Vec_Int_get_safe(&bucket_chains, id);
+                wassert(bucket_keys);
+            };
+            ID node = ID_make(i);
+            if (Map_Int__slot_is_empty(m, node)) { continue; }
+            while (ID_valid(node)) {
+                Vec_Int_append(bucket_keys, m->keys.items[ID_get(node)]);
+                node = m->bucket_next.items[ID_get(node)];
+            }
+        }
+        integrity.bucket_chains = (View_Vec_Int) {bucket_chains.items, bucket_chains.size};
+    }
+    return integrity;
+}
+
+bool check_integrity(Map_Int *m, IntegrityTest integrity, Arena scratch) {
+    // Check buckets.
+    {
+
+        if (integrity.bucket_chains.size != (1 << m->bucket_count_exp)) {
+            printferr("Wrong amount of buckets."); return false;
+        }
+
+        for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
+
+            Vec_Int keys = Vec_Int_create_with_allocator(arena_allocator, &scratch);
+
+            {
+                // Make copy.
+                Vec_Int *keys_og = &integrity.bucket_chains.items[i];
+                for (dyna_foreach_gnu(iter, *keys_og)) { Vec_Int_append(&keys, *iter.ref); }
+            }
+
+            ID node = ID_make(i);
+            ID last_valid_node = node;
+            if (Map_Int__slot_is_empty(m, node)) {
+                if (keys.size == 0) { continue; }
+                else {
+                    printferr("Coudln't find any, expected %d (bucket %d).", keys.size, i);
+                    return false;
+                }
+            }
+
+            // Checks bucket integrity FORWARDS.
+            {
+                while (ID_valid(node)) {
+                    bool found = false;
+                    for (int l = 0; l < keys.size; ++l) {
+                        if (keys.items[l] == m->keys.items[ID_get(node)]) {
+                            found = true; Vec_Int_remove_at(&keys, l); break;
+                        }
+                    }
+                    if (!found) { printferr("Failed to find key"); return false; }
+                    node = m->bucket_next.items[ID_get(node)];
+                    if (ID_valid(node)) { last_valid_node = node; }
+                }
+                if (keys.size != 0) {
+                    printferr("Couldn't find all.");
+                    for (int l = 0; l < keys.size; ++l) { printferr("Missing %d", keys.items[i]); }
+                    return false;
+                }
+            }
+
+
+            {
+                // Make copy.
+                Vec_Int_clear_preserving(&keys);
+                Vec_Int *keys_og = &integrity.bucket_chains.items[i];
+                for (dyna_foreach_gnu(iter, *keys_og)) { Vec_Int_append(&keys, *iter.ref); }
+            }
+
+            // Checks bucket integrity BACKWARDS.
+            {
+                node = last_valid_node;
+                while (ID_valid(node)) {
+                    bool found = false;
+                    for (int l = 0; l < keys.size; ++l) {
+                        if (keys.items[l] == m->keys.items[ID_get(node)]) {
+                            found = true; Vec_Int_remove_at(&keys, l); break;
+                        }
+                    }
+                    if (!found) { printferr("Failed to find key"); return false; }
+                    node = m->bucket_prev.items[ID_get(node)];
+                }
+                if (keys.size != 0) {
+                    printferr("Couldn't find all.");
+                    for (int l = 0; l < keys.size; ++l) { printferr("Missing %d", keys.items[i]); }
+                    return false;
+                }
+            }
+        }
+    }
+    // Check order.
+    {
+        View_Int ordered_keys = integrity.ordered_keys;
+        for (int i = 0; i < ordered_keys.size; ++i) {
+            printfd("(size %d) Expected order %d", ordered_keys.size, ordered_keys.items[i]);
+        }
+        int i = 0;
+        ID node = m->first_node;
+        bool failed = false;
+        while(ID_valid(node)) {
+            if (i >= ordered_keys.size) { printferr("Wrong amount of keys."); return false; }
+            printfd("%d !=? %d", ordered_keys.items[i], m->keys.items[ID_get(node)]);
+            /*if (ordered_keys.items[i] != m->keys.items[ID_get(node)]) { printferr("Wrong order."); return false; }*/
+            if (ordered_keys.items[i] != m->keys.items[ID_get(node)]) { failed = true; }
+            node = m->next.items[ID_get(node)];
+            ++i;
+        }
+        if (failed) { printferr("Wrong order."); return false; }
+    }
+    return true;
+}
+
+/*
+   Swaps all nodes of the same bucket and test whether they're still all present.
+   */
+void shuffle_nodes_same_bucket(Map_Int *m, const int iterations, Arena arena) {
     for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
         Arena scratch = arena;
         Vec_Int bucket_nodes = Vec_Int_create_with_allocator(arena_allocator, &scratch);
-        Vec_Int keys = Vec_Int_create_with_allocator(arena_allocator, &scratch);
 
         const ID bucket = ID_make(i);
-        printfd(ANSI_BLU"bucket %d", ID_get(bucket));
-        if (!ID_valid(bucket)) { continue; }
+        if (Map_Int__slot_is_empty(m, bucket)) { continue; }
         ID node = bucket;
         while (ID_valid(node)) {
             Vec_Int_append(&bucket_nodes, ID_get(node));
-            Vec_Int_append(&keys, m->keys.items[ID_get(node)]);
             node = m->bucket_next.items[ID_get(node)];
         }
 
         // Now shuffle them all like a maniac.
-        printfd("Range [%d %d], valid? %d", 0, bucket_nodes.size-1, ID_valid(bucket));
-        for (int k = 0; k < 50; ++k) {
+        for (int k = 0; k < iterations; ++k) {
             int a = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
             int b = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
-            printfd("Shuffling %d and %d", a, b);
-            Map_Int__swap_nodes_same_bucket(m, ID_make(a), ID_make(b), bucket);
-        }
-
-        Map_Int_print(m);
-        Map_Int_print_bucket_chains(m, false);
-
-        // Check integrity:
-
-        node = bucket;
-        while (ID_valid(node)) {
-            bool found = false;
-            printfd("node %d", ID_get(node));
-            for (int l = 0; l < keys.size; ++l) {
-                printfd("(size %d) Checking %d and %d", keys.size, keys.items[l], m->keys.items[ID_get(node)]);
-                if (keys.items[l] == m->keys.items[ID_get(node)]) {
-                    found = true;
-                    Vec_Int_remove_at(&keys, l);
-                    break;
-                }
-            }
-            if (!found) { return false; }
-            node = m->bucket_next.items[ID_get(node)];
-        }
-        if (keys.size != 0) {
-            printferr("Couldn't find all.");
-            for (int l = 0; l < keys.size; ++l) {
-                printferr("Missing %d", keys.items[i]);
-            }
-            return false;
+            Map_Int__swap_nodes_same_bucket(m, ID_make(a), ID_make(b));
         }
     }
-    printf("Expected order forward:\n");
-    for (int i = 0; i < ordered_keys.size; ++i) {
-        printf("%d,", ordered_keys.data[i]);
-    }
-    printf("\nActual ");
-    Map_Int_print_order(m, false);
-    // Check order.
-    {
-        int i = 0;
-        ID node = m->first_node;
-        while(ID_valid(node)) {
-            if (i >= ordered_keys.size) { return false; }
-            printfd("Cheking order %d should be %d", ordered_keys.data[i], m->keys.items[ID_get(node)]);
-            if (ordered_keys.data[i] != m->keys.items[ID_get(node)]) {
-                return false;
-            }
-            node = m->next.items[ID_get(node)];
-            ++i;
-        }
-    }
-    return true;
 }
 
 
@@ -241,19 +332,55 @@ TEST test_general(void) {
         printfd("↑↑↑");
     }
 
-    if ((0)) {
-        printfd("↓↓↓");
+    if ((1)) {
+        IntegrityTest integrity = get_integrity_snapshot(m, &arena);
         Map_Int_print(m);
         Map_Int_print_bucket_chains(m, true);
         Map_Int_print_order(m, false);
-        printfd("---");
-        Map_Int__swap_nodes_same_bucket(m, ID_make(2), ID_make(3), ID_make(1));
+        shuffle_nodes_same_bucket(m, 50, arena);
         Map_Int_print(m);
         Map_Int_print_bucket_chains(m, true);
         Map_Int_print_order(m, false);
-        printfd("↑↑↑");
-        ASSERT(shuffle_nodes_same_bucket(m, arena));
+        ASSERT(check_integrity(m, integrity, arena));
     }
+
+    // Test remove.
+    Map_Int_print(m);
+    Map_Int_print_bucket_chains(m, true);
+    Map_Int_print_order(m, false);
+
+    int key;
+    key = 888;
+    printfd("Removing %d", key);
+    Map_Int_remove(m, key);
+    Map_Int_print(m);
+    Map_Int_print_bucket_chains(m, true);
+    Map_Int_print_order(m, false);
+    key = 3;
+    printfd("Removing %d", key);
+    Map_Int_remove(m, key);
+    Map_Int_print(m);
+    Map_Int_print_bucket_chains(m, true);
+    Map_Int_print_order(m, false);
+    key = 4;
+    printfd("Removing %d", key);
+    Map_Int_remove(m, key);
+    Map_Int_print(m);
+    Map_Int_print_bucket_chains(m, true);
+    Map_Int_print_order(m, false);
+    key = 5;
+    printfd("Removing %d", key);
+    Map_Int_remove(m, key);
+    Map_Int_print(m);
+    Map_Int_print_bucket_chains(m, true);
+    Map_Int_print_order(m, false);
+    key = 1;
+    printfd("Removing %d", key);
+    Map_Int_remove(m, key);
+    Map_Int_print(m);
+    Map_Int_print_bucket_chains(m, true);
+    Map_Int_print_order(m, false);
+
 
     /*{*/
         /*Map_Int_It it = Map_Int_make_it(m);*/
@@ -264,12 +391,9 @@ TEST test_general(void) {
 
     /*ASSERT_INT(err, 0);*/
 
-    intview_t nums2 = intview_literal(100);
-    for (int i = 0; i < nums2.size; ++i) {
-        printfd("nums %d", nums2.data[i]);
-    }
 
     Map_Int_free(m);
+    ArenaRoot_free(&arenaroot);
     TEST_PASS;
 }
 
