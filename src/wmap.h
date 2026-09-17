@@ -83,9 +83,6 @@ inline bool        wmap__zid_valid(wmap__zid_t id)         { return id.id > 0; }
 #define ARRAY__TYPE ID
 #define ARRAY__NAMESPACE WMAP__PRI(Arr_Int)
 #include "array.h"
-//#define DYNA__TYPE WMAP__TYPE
-//#define DYNA__NAMESPACE WMAP__PRI(Vec_Value)
-//#include "da.h"
 #define SLOT__TYPE WMAP__TYPE
 #define SLOT__NAMESPACE WMAP__PRI(Slot_Value)
 #include "slot.h"
@@ -108,8 +105,7 @@ typedef struct {
     pri(Arr_Int) prev;
     pri(Arr_Int) bucket_next;
     pri(Arr_Int) bucket_prev;
-    //pri(Arr_Int) bucket_tail;
-    //pri(Vec_Value) values;
+
     pri(Slot_Value) values;
     int capacity_exp;
     int bucket_count_exp;
@@ -133,10 +129,12 @@ typedef struct {
 bool pri(default_equal)(KEY a, KEY b, void *data) { (void)data; return 0 == memcmp(&a, &b, sizeof(a)); }
 uint64_t pri(default_hash)(KEY k, void *data) { (void)data; return wmap__hash((char*)&k, sizeof(k)); }
 pub(It) pub(make_it)(const WMap *m) { return (pub(It)) { .__id = m->first_node, }; }
+pub(It) pub(make_it_end)(const WMap *m) { return (pub(It)) { .__id = m->last_node, }; }
 int pri(allocate_direct_storage)(WMap *m, int cap_exp);
 int pri(grow_collision_storage)(WMap *m, int new_cap_exp);
 void pri(clear)(WMap *m, int from, int to);
 
+/// @Note: Init doesn't allocate anything (keep it like that).
 void pri(init)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
     *m = (WMap) { 0 };
     m->keys        = pri(Arr_Key_create_with_allocator)(allocator, allocator_userdata);
@@ -180,12 +178,11 @@ void pri(clear)(WMap *m, int from, int to) {
     memset(m->val_ids.items + from, 0, sizeof(m->val_ids.items[0]) * (size_t)(to - from));
     memset(m->bucket_next.items  + from, 0, sizeof(m->bucket_next.items[0]) * (size_t)(to - from));
     memset(m->bucket_prev.items  + from, 0, sizeof(m->bucket_prev.items[0]) * (size_t)(to - from));
-    // @Note: Bucket_limits aren't cleared here because they're
-    //        can only be cleared once per map.
 }
 
 // @Note: Only call on newly created maps.
 int pri(allocate_direct_storage)(WMap *m, int cap_exp) {
+    wassert(m->capacity_exp == 0);
     int size = 1 << cap_exp;
     if (pri(Arr_Key_resize)(&m->keys, size))          { return -1; }
     if (pri(Arr_Int_resize)(&m->next, size))          { return -1; }
@@ -194,9 +191,7 @@ int pri(allocate_direct_storage)(WMap *m, int cap_exp) {
     if (pri(Arr_Int_resize)(&m->bucket_prev, size))   { return -1; }
     if (pri(Arr_Int_resize)(&m->val_ids, size))       { return -1; }
     if (pri(Arr_Int_resize)(&m->val_ids, size))       { return -1; }
-    //if (pri(Arr_Int_resize)(&m->bucket_tail, size)){ return -1; }
     pri(clear)(m, 0, size);
-    //memset(m->bucket_tail.items, 0, sizeof(m->bucket_tail.items[0]) * (size_t)(size));
     m->capacity_exp = cap_exp;
     return 0;
 }
@@ -233,7 +228,7 @@ static inline int pri(set_new_pair)(WMap *m, ID node_prev, ID node_new, KEY key,
 int pri(rehash_if_needed)(WMap *old_m) {
     const float factor = (float)old_m->pair_count / (float)(1 << old_m->bucket_count_exp);
     if (factor < WMAP__REHASH_FACTOR) { return 0; }
-    printfd(ANSI_RED"REHASHING IS NEEDED!!");
+    printfd(ANSI_RED"REHASHING IS NEEDED!! (factor %f)", factor);
 
     // Create new map.
     WMap __new_map;
@@ -265,9 +260,7 @@ int pri(rehash_if_needed)(WMap *old_m) {
     }
 
     // Swap data and free.
-    pri(Slot_Value) bk = new_m->values;
-    new_m->values = old_m->values;
-    old_m->values = bk;
+    SWAP(new_m->values, old_m->values);
     pub(free)(old_m);
     *old_m = *new_m;
 
@@ -298,9 +291,6 @@ static inline int pri(set_new_pair)(WMap *m, ID i_bucket_prev, ID i_new, KEY key
     m->val_ids.items[ID_get(i_new)] = value_id;
     m->last_node = i_new;
     ++m->pair_count;
-    // ↓↓ Setting limits for current bucket.
-    //m->bucket_tail.items[ID_get(bucket_id)] = i_new;
-    //
     return 0;
 }
 
@@ -333,7 +323,8 @@ int pri(find)(WMap *m, const ID start, KEY key, ID *out_prev_id, ID *out_id) {
 }
 
 
-// @Note: Keep this function in sync with 'rehash insert'.
+/// @Returns error.
+/// @Note: Keep this function in sync with 'rehash insert'.
 int pub(upsert)(WMap *m, KEY key, TYPE item) {
     ID bucket_id = ID_make(pri(hash_and_get_bucket)(m, key));
     ID i_prev = { 0 };
@@ -342,7 +333,6 @@ int pub(upsert)(WMap *m, KEY key, TYPE item) {
     if (found) {
         // Update.
         pri(Slot_Value_update)(&m->values, ID_get(m->val_ids.items[ID_get(i)]), item);
-        //m->values.items[ID_get(m->val_ids.items[ID_get(i)])] = item; // Update.
         printfd("Updated");
         return 0;
     }
@@ -351,12 +341,11 @@ int pub(upsert)(WMap *m, KEY key, TYPE item) {
         int err = pri(grow_collision_storage)(m, m->capacity_exp + 1);
         if (err) { return -1; }
     }
-    //ID value_id = ID_make(pri(Vec_Value_append)(&m->values, item));
     ID value_id = ID_make(pri(Slot_Value_append)(&m->values, item));
     if (!ID_valid(value_id)) { return -1; }
     pri(set_new_pair)(m, i_prev, i, key, value_id);
     if (ID_get(i) >= (1 << m->bucket_count_exp)) { ++m->collision_count; }
-    //if (pri(rehash_if_needed)(m)) { printferr("W: Rehashing failed."); }
+    if (pri(rehash_if_needed)(m)) { printferr("W: Rehashing failed."); }
     return 0;
 }
 
@@ -461,12 +450,12 @@ void pri(swap_nodes_diff_bucket)(WMap *m, ID a, ID b) {
     }
 }
 
-int pub(remove)(WMap *m, KEY key) {
+void pub(remove)(WMap *m, KEY key) {
     ID bucket_id = ID_make(pri(hash_and_get_bucket)(m, key));
     ID i_bucket_prev = { 0 };
     ID i = bucket_id;
     bool found = 0 == pri(find)(m, i, key, &i_bucket_prev, &i);
-    if (!found) { return 0; }
+    if (!found) { return; }
 
     // 1. If 'in direct' and has bucket_next -> Swap node to next in it's bucket.
     if (ID_get(i) < (1 << m->bucket_count_exp) && ID_valid(m->bucket_next.items[ID_get(i)])) {
@@ -504,17 +493,23 @@ int pub(remove)(WMap *m, KEY key) {
         m->bucket_prev.items[ID_get(i)] = ID_INVALID;
         --m->pair_count;
     }
-    return 0;
 }
 
 
+TYPE * pub(get)(WMap *m, KEY key) {
+    ID bucket_id = ID_make(pri(hash_and_get_bucket)(m, key));
+    ID i_bucket_prev = { 0 };
+    ID i = bucket_id;
+    bool found = 0 == pri(find)(m, i, key, &i_bucket_prev, &i);
+    if (!found) { return 0; }
+    return pri(Slot_Value_get)(&m->values, ID_get(m->val_ids.items[ID_get(i)]));
+}
 
 
 /// @Note. Modifying the map while iterating is UB.
 bool pub(it_next)(const WMap *m, pub(It) *it) {
     while (ID_valid(it->__id)) {
         it->key = m->keys.items[ID_get(it->__id)];
-        //it->value = &m->values.items[ID_get(m->val_ids.items[ID_get(it->__id)])];
         it->value = pri(Slot_Value_get)(&m->values, ID_get(m->val_ids.items[ID_get(it->__id)]));
         it->__value_id = m->val_ids.items[ID_get(it->__id)];
         it->__id = m->next.items[ID_get(it->__id)];
@@ -524,131 +519,19 @@ bool pub(it_next)(const WMap *m, pub(It) *it) {
 }
 
 
-void pub(print)(const WMap *m) {
-    printf("Printing map, size %d, buckets %d, pairs %d, cols %d, first %d, last %d",
-            1 << m->capacity_exp, 1 << m->bucket_count_exp,
-            m->pair_count, m->collision_count, ID_get(m->first_node), ID_get(m->last_node));
-    printf("\nkeys:    ");
-    for (int i = 0; i < 1 << m->capacity_exp; ++i) {
-        printf("%5d|", m->keys.items[i]);
-        if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
+/// @Note. Modifying the map while iterating is UB.
+bool pub(it_prev)(const WMap *m, pub(It) *it) {
+    while (ID_valid(it->__id)) {
+        it->key = m->keys.items[ID_get(it->__id)];
+        it->value = pri(Slot_Value_get)(&m->values, ID_get(m->val_ids.items[ID_get(it->__id)]));
+        it->__value_id = m->val_ids.items[ID_get(it->__id)];
+        it->__id = m->prev.items[ID_get(it->__id)];
+        return true;
     }
-    printf("\nvalueid: ");
-    for (int i = 0; i < 1 << m->capacity_exp; ++i) {
-        printf("%5d|", ID_get(m->val_ids.items[i]));
-        if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
-    }
-    printf("\nbuck_nxt:");
-    for (int i = 0; i < 1 << m->capacity_exp; ++i) {
-        printf("%5d|", ID_get(m->bucket_next.items[i]));
-        if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
-    }
-    printf("\nbuck_prv:");
-    for (int i = 0; i < 1 << m->capacity_exp; ++i) {
-        printf("%5d|", ID_get(m->bucket_prev.items[i]));
-        if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
-    }
-    printf("\nvalues:  ");
-    for (int i = 0; i < m->values.count; ++i) {
-        printf("[%d]=%d,", m->values.itemid_to_userid[i], m->values._items[i]);
-    }
-    printf("\nnext:    ");
-    for (int i = 0; i < 1 << m->capacity_exp; ++i) {
-        printf("%5d|", ID_get(m->next.items[i]));
-        if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
-    }
-    printf("\nprev:    ");
-    for (int i = 0; i < 1 << m->capacity_exp; ++i) {
-        printf("%5d|", ID_get(m->prev.items[i]));
-        if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
-    }
-    //printf("\nbuk_limt:");
-    //for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
-        //printf("%2d,%2d|", i, ID_get(m->bucket_tail.items[i]));
-        //if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
-    //}
-    printf("\n");
+    return false;
 }
 
-void pub(print_order)(const WMap *m, bool backwards) {
-    const int MAX_CYCLES = 100;
-    int cycles = 0;
-    ID node = m->first_node;
-    printf("Order Forward:\n");
-    while(ID_valid(node)) {
-        printf("%d,", m->keys.items[ID_get(node)]);
-        node = m->next.items[ID_get(node)];
-        if (++cycles > MAX_CYCLES) { printf("\n"); return; }
-    }
-    printf("\n");
-    if (!backwards) { return; }
-    cycles = 0;
-    printf("Order Backwards:\n");
-    node = m->last_node;
-    while(ID_valid(node)) {
-        printf("%d,", m->keys.items[ID_get(node)]);
-        node = m->prev.items[ID_get(node)];
-        if (++cycles > MAX_CYCLES) { printf("\n"); return; }
-    }
-    printf("\n");
-}
 
-void pub(print_bucket_chains)(const WMap *m, bool backwards) {
-    const int max_cycles = 100;
-    int cycles = 0;
-    printf("Forward:\n");
-    for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
-        ID id = ID_make(i);
-        printf("(bucket %d): ", i);
-        if (!ID_valid(m->val_ids.items[ID_get(id)])) { printf("\n"); continue; }
-        while (ID_valid(id)) {
-            //printf("%d"ANSI_GRE"(%d)"ANSI_RESET",", ID_get(id), m->keys.items[ID_get(id)]);
-            printf("%d,", m->keys.items[ID_get(id)]);
-            id = m->bucket_next.items[ID_get(id)];
-
-            if (++cycles > max_cycles) { return; }
-        }
-        printf("\n");
-    }
-    (void)backwards;
-    //if (!backwards) { return; }
-    //cycles = 0;
-    //printf("Backwards:\n");
-    //for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
-        //ID id = m->bucket_tail.items[i];
-        //while (ID_valid(id)) {
-            //printf("%d,", m->keys.items[ID_get(id)]);
-            //id = m->bucket_prev.items[ID_get(id)];
-
-            //if (++cycles > max_cycles) { return; }
-        //}
-        //printf("\n");
-    //}
-}
-
-/*
-    int i = pri(hash_and_get_bucket)(m, key);
-    int node_last = i;
-    while (i > 0) {
-    for (int i = pri(hash_and_get_bucket)(m, key), node_last = i; i > 0; 
-        if (WMAP__KEY_EQUAL(m->keys[i-1], key, m->userdata)) {
-            bucket->pairs.items[i-1].value = value; // Update.
-            return 0;
-        }
-        node_last = i;
-        i = m->next[i-1];
-    }
-    */
-
-/*
-    int i = pri(hash_and_get_bucket)(m, key), i_prev = i;
-    for (; i > 0 && m->keys.items[i-1].value_id != 0; i_prev = i, i = m->next.items[i-1]) {
-        if (WMAP__KEY_EQUAL(m->keys.items[i-1].key, key, m->userdata)) {
-            m->values_old.items[m->keys.items[i-1].value_id-1] = item; // Update.
-            return 0;
-        }
-    }
-   */
 
 
 #undef pub
