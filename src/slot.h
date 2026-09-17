@@ -41,7 +41,7 @@ typedef struct Slot {
 
     int *userid_to_itemid; // Maps a stable id to an internal id (which we are allowed to change).
     int *itemid_to_userid;
-    TYPE *items;
+    TYPE *_items;
 
     SLOT__ALLOC_PROTOTYPE(*allocator);
     void *allocator_user_data;
@@ -55,13 +55,13 @@ int pfx(_grow)(Slot *s, int new_capacity) {
 
     int* new_userid_to_itemid = (int*) allocator(s->userid_to_itemid, (size_t)new_capacity * sizeof(int), alignof(int)  , s->allocator_user_data);
     int* new_itemid_to_userid = (int*) allocator(s->itemid_to_userid, (size_t)new_capacity * sizeof(int), alignof(int)  , s->allocator_user_data);
-    TYPE* new_items           = (TYPE*)allocator(s->items           , (size_t)new_capacity * sizeof(TYPE), alignof(TYPE), s->allocator_user_data);
+    TYPE* new_items           = (TYPE*)allocator(s->_items           , (size_t)new_capacity * sizeof(TYPE), alignof(TYPE), s->allocator_user_data);
 
     if (new_userid_to_itemid == NULL
         || new_itemid_to_userid == NULL
         || new_items == NULL
     ) {
-        if (s->items == NULL) { // In case it's first time allocation free on failure.
+        if (s->_items == NULL) { // In case it's first time allocation free on failure.
             if (new_userid_to_itemid != NULL) { allocator(new_userid_to_itemid, 0, 0, s->allocator_user_data); }
             if (new_itemid_to_userid != NULL) { allocator(new_itemid_to_userid, 0, 0, s->allocator_user_data); }
             if (new_items            != NULL) { allocator(new_items           , 0, 0, s->allocator_user_data); }
@@ -78,7 +78,7 @@ int pfx(_grow)(Slot *s, int new_capacity) {
     s->capacity         = new_capacity;
     s->userid_to_itemid = new_userid_to_itemid;
     s->itemid_to_userid = new_itemid_to_userid;
-    s->items            = new_items;
+    s->_items            = new_items;
     return 0;
 }
 
@@ -88,7 +88,7 @@ int pfx(create_with_allocator)(Slot *s, SLOT__ALLOC_PROTOTYPE(*allocator), void 
     *s = (Slot) { 0 };
     s->allocator = allocator;
     s->allocator_user_data = allocator_user_data;
-    return pfx(_grow)(s, 2); // DEFAULT CAPACITY.
+    return 0;
 }
 
 
@@ -116,12 +116,12 @@ void pfx(clear)(Slot *s) {
 int pfx(append)(Slot *s, TYPE item) {
     // Space left?
     if (s->count >= s->capacity) {
-        int err = pfx(_grow)(s, s->capacity * 2);
+        enum { DEFAULT_CAPACITY = 2 };
+        int err = pfx(_grow)(s, s->capacity == 0 ? DEFAULT_CAPACITY : s->capacity * 2);
         if (err != 0) { return -1; }
     }
-
     int item_id = s->count;
-    s->items[item_id] = item;
+    s->_items[item_id] = item;
     ++s->count;
     return s->itemid_to_userid[item_id];
 }
@@ -132,7 +132,17 @@ TYPE *pfx(get)(const Slot *s, int user_id) {
     if (user_id < 0 || user_id > s->capacity) { return NULL; }
     int item_id = s->userid_to_itemid[user_id];
     if (item_id >= s->count) { return NULL; }
-    return &s->items[item_id];
+    return &s->_items[item_id];
+}
+
+
+/// @Returns error.
+int pfx(update)(const Slot *s, int user_id, TYPE item) {
+    if (user_id < 0 || user_id > s->capacity) { return -1; }
+    int item_id = s->userid_to_itemid[user_id];
+    if (item_id >= s->count) { return -1; }
+    s->_items[item_id] = item;
+    return 0;
 }
 
 
@@ -142,7 +152,7 @@ int pfx(pop)(Slot *s, int user_id) {
     if (s->count <= 0) { return -1; }
     // Swap items.
     int item_id = s->userid_to_itemid[user_id];
-    s->items[item_id] = s->items[s->count -1];
+    s->_items[item_id] = s->_items[s->count -1];
     // Swap itemid_to_userid.
     int bk = s->itemid_to_userid[item_id];
     s->itemid_to_userid[item_id] = s->itemid_to_userid[s->count -1];
@@ -174,7 +184,7 @@ size_t pfx(report_memory)(const Slot *s) {
     size_t count = sizeof(Slot);
     count += (size_t)s->capacity * sizeof(*s->userid_to_itemid);
     count += (size_t)s->capacity * sizeof(*s->itemid_to_userid);
-    count += (size_t)s->capacity * sizeof(*s->items);
+    count += (size_t)s->capacity * sizeof(*s->_items);
     return count;
 }
 

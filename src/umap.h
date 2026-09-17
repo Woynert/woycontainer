@@ -46,7 +46,6 @@
 #endif
 
 
-/* Token concatenation. */
 #define UMAP__TOKCAT_(a, b) a ## b
 #define UMAP__TOKCAT(a, b) UMAP__TOKCAT_(a, b)
 #ifndef UMAP__NAMESPACE
@@ -119,8 +118,7 @@ size_t       pub(report_memory)        (UMap *m);
 
 int                        pri(grow)                   (UMap *m, int new_size);
 int                        pri(init)                   (UMap *m, UMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
-static inline int          pri(hash_and_get_bucket_id) (UMap *m, KEY key);
-static inline pri(Bucket)* pri(hash_and_get_bucket)    (UMap *m, KEY key);
+static inline pri(Bucket) *pri(hash_and_get_bucket)    (UMap *m, KEY key);
 int                        pri(rehash_if_needed)       (UMap *old_m);
 static inline int          pri(set_pair_with_final_key)(UMap *m, pri(Bucket) *bucket, KEY key, TYPE value);
 
@@ -150,7 +148,6 @@ int pri(init)(UMap *m, UMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userda
 
 
 int pub(create_with_allocator)(UMap *m, UMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
-    *m = (UMap) { 0 };
     int err = pri(init)(m, allocator, allocator_userdata);
     if (err != 0) { return -1; }
     return pri(grow)(m, UMAP__DEFAULT_SIZE_EXP); // DEFAULT CAPACITY.
@@ -192,15 +189,10 @@ inline uint64_t umap__hash(char *data, int size) {
     }
     return h;
 }
-bool umap__default_equal(KEY a, KEY b, void *data) { (void)data; return memcmp(&a, &b, sizeof(a)); }
+bool umap__default_equal(KEY a, KEY b, void *data) { (void)data; return 0 == memcmp(&a, &b, sizeof(a)); }
 uint64_t umap__default_hash(KEY k, void *data) { (void)data; return umap__hash((char*)&k, sizeof(k)); }
 #endif
 
-
-//static inline int pri(hash_and_get_bucket_id)(UMap *m, KEY key) {
-    //uint64_t hash = UMAP__KEY_HASH(key, m->userdata);
-    //return (int)(hash & (uint64_t)(m->buckets.size - 1));
-//}
 
 
 /// @Note. Cannot fail.

@@ -113,6 +113,7 @@ static inline Dyna pfx(create) (void) {
 
 static inline Dyna pfx(create_with_allocator) (DYNA__ALLOC_PROTOTYPE(*allocator), void *user_data) {
     return (Dyna) { .allocator = allocator, .allocator_user_data = user_data };
+    // @Note: Creating doesn't allocate and never will.
 }
 
 
@@ -450,6 +451,8 @@ static DYNA__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
 
 #ifndef DYNA__MACROS
 #define DYNA__MACROS
+#define dyna_foreach_gnu(iter, array) \
+    struct { int index; typeof((array).items) ref; } iter = { .index = 0, .ref = (array).items }; iter.index < (array).size; ++iter.index, ++iter.ref
 #define dyna_foreach(type, iter, array) \
     struct { int index; type *ref; } iter = { .index = 0, .ref = (array).items }; iter.index < (array).size; ++iter.index, ++iter.ref
 #define dyna_foreach_reverse(type, iter, array) \

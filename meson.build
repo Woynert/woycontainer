@@ -14,7 +14,7 @@ if not meson.is_subproject()
   warning_flags = [
     '-Wall',
     '-Wextra',
-    '-Wpedantic',
+    #'-Wpedantic', # I removed it because I want gnu-statement-expression.
     '-Werror',
     '-Wshadow',
     '-Wno-language-extension-token',
@@ -23,6 +23,8 @@ if not meson.is_subproject()
     '-Wno-error=unused-parameter',
     '-Wno-error=unused-function',
     '-Wno-error=unused-variable',
+    '-Wno-unused-function',
+    '-Wno-gnu-statement-expression',
   ]
   san_flags = [
     '-fsanitize=address,undefined',

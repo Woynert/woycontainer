@@ -196,4 +196,36 @@ int find_multiple_max_fit(int n, int cap) {
     return (int)floorf((float)cap / (float)n);
 }
 
+
+// START [RANDOM NUMBERS]
+// Source https://stackoverflow.com/a/39714913
+typedef uint32_t uint_type; // can be any unsigned type.
+#define RAND_UINT_MAX ((uint_type) -1)
+uint_type rand_uint(void) {
+    // These are all constant and factor is likely a power of two.
+    // therefore, the compiler has enough information to unroll
+    // the loop and can use an immediate form shl in-place of mul.
+    uint_type factor = (uint_type) RAND_MAX + 1;
+    uint_type factor_to_k = 1;
+    uint_type cutoff = factor ? RAND_UINT_MAX / factor : 0;
+    uint_type result = 0;
+    while ( 1 ) {
+        result += (uint_type)rand() * factor_to_k;
+        if (factor_to_k <= cutoff) { factor_to_k *= factor; }
+        else { return result; }
+    }
+}
+// Note(woynert): I have the feeling this function is slow because of the
+//     cast to double I guess it would be faster to directly generate the
+//     bytes for the int.
+//     Because if we are already casting to double then why not just do
+//     something like (double)rand()/RAND_MAX ?
+// Uniform int distribution.
+int rand_range(int min, int max) {
+    // [0,1) -> [min,max]
+    double canonical = rand_uint() / (RAND_UINT_MAX + 1.0);
+    return (int)floor(canonical * (1.0 + max - min) + min);
+}
+// END [RANDOM NUMBERS]
+
 #endif
