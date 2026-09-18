@@ -1,3 +1,31 @@
+/*
+    Ordered hash map.
+
+    Features:
+
+    * All operations are constant time O(1), for example: upsert, get, remove.
+    * Orderly forward and reverse iteration.
+    * Good memory locality.
+       * Uses struct of arrays (ECS like).
+       * Operations only read what they need. (Most of the time).
+
+    Example 1: Use binary comparison.
+
+        #define WMAP__KEY  int
+        #define WMAP__TYPE Car
+        #define WMAP__KEY_CAN_DO_BINARY_COMPARISON_AND_HASH
+        #include "wmap.h"
+
+    Example 2: Use custom comparison and hash.
+
+        #define WMAP__KEY  Human
+        #define WMAP__TYPE Car
+        #define WMAP__KEY_EQUAL Human_equals
+        #define WMAP__KEY_HASH  Human_hash
+        #include "wmap.h"
+
+    Define WMAP__NAMESPACE to set custom struct prefix.
+*/
 
 #include <stddef.h>
 #include <stdint.h>
@@ -126,13 +154,33 @@ typedef struct {
 
 
 
-bool pri(default_equal)(KEY a, KEY b, void *data) { (void)data; return 0 == memcmp(&a, &b, sizeof(a)); }
-uint64_t pri(default_hash)(KEY k, void *data) { (void)data; return wmap__hash((char*)&k, sizeof(k)); }
+int     pub(create)(WMap *m);
+int     pub(create_with_allocator)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
+void    pub(set_userdata)(WMap *m, void *data) { m->userdata = data; }
+void    pub(free)(WMap *m);
+int     pub(upsert)(WMap *m, KEY key, TYPE item);
+void    pub(remove)(WMap *m, KEY key);
+TYPE *  pub(get)(WMap *m, KEY key);
 pub(It) pub(make_it)(const WMap *m) { return (pub(It)) { .__id = m->first_node, }; }
 pub(It) pub(make_it_end)(const WMap *m) { return (pub(It)) { .__id = m->last_node, }; }
+bool    pub(it_next)(const WMap *m, pub(It) *it);
+bool    pub(it_prev)(const WMap *m, pub(It) *it);
+
+void pri(init)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
+void pri(clear)(WMap *m, int from, int to);
 int pri(allocate_direct_storage)(WMap *m, int cap_exp);
 int pri(grow_collision_storage)(WMap *m, int new_cap_exp);
-void pri(clear)(WMap *m, int from, int to);
+int pri(rehash_if_needed)(WMap *old_m);
+int pri(find)(WMap *m, const ID start, KEY key, ID *out_prev_id, ID *out_id);
+static inline int pri(set_new_pair)(WMap *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id);
+static inline int pri(hash_and_get_bucket)(WMap *m, KEY key);
+void pri(swap_nodes_same_bucket)(WMap *m, const ID a, const ID b);
+void pri(swap_nodes_diff_bucket)(WMap *m, ID a, ID b);
+bool pri(default_equal)(KEY a, KEY b, void *data) { (void)data; return 0 == memcmp(&a, &b, sizeof(a)); }
+uint64_t pri(default_hash)(KEY k, void *data) { (void)data; return wmap__hash((char*)&k, sizeof(k)); }
+static inline bool pri(slot_is_empty(WMap *m, ID i)) { return !ID_valid(m->val_ids.items[ID_get(i)]); }
+
+
 
 /// @Note: Init doesn't allocate anything (keep it like that).
 void pri(init)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
@@ -157,8 +205,6 @@ int pub(create_with_allocator)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void 
 int pub(create)(WMap *m) {
     return pub(create_with_allocator)(m, NULL, NULL);
 }
-
-void pub(set_userdata)(WMap *m, void *data) { m->userdata = data; }
 
 void pub(free)(WMap *m) {
     pri(Arr_Key_destroy)(&m->keys);
@@ -197,7 +243,8 @@ int pri(allocate_direct_storage)(WMap *m, int cap_exp) {
 }
 
 // @Note: The difference between this and 'allocate_direct_storage' is
-//        this can be called more than once, since it doesn't touch 'bucket_limits'.
+//        this can be called more than once.
+// @Note: Actually things have changed. They should be able to merge now.
 int pri(grow_collision_storage)(WMap *m, int new_cap_exp) {
     int size = 1 << m->capacity_exp;
     int new_size = 1 << new_cap_exp;
@@ -220,15 +267,11 @@ static inline int pri(hash_and_get_bucket)(WMap *m, KEY key) {
     return bucket_id;
 }
 
-bool pub(it_next)(const WMap *m, pub(It) *it);
-
-int pri(find)(WMap *m, ID start, KEY key, ID *out_prev_id, ID *out_id);
-static inline int pri(set_new_pair)(WMap *m, ID node_prev, ID node_new, KEY key, ID value_id);
 
 int pri(rehash_if_needed)(WMap *old_m) {
     const float factor = (float)old_m->pair_count / (float)(1 << old_m->bucket_count_exp);
     if (factor < WMAP__REHASH_FACTOR) { return 0; }
-    //printfd(ANSI_RED"REHASHING IS NEEDED!! (factor %f)", factor);
+    //printfd(ANSI_RED"D: Rehashing (factor %f)", factor);
 
     // Create new map.
     WMap __new_map;
@@ -272,7 +315,7 @@ int pri(rehash_if_needed)(WMap *old_m) {
 }
 
 
-/// @Param. i_prev. Can be invalid.
+/// @Param. i_bucket_prev. Can be invalid.
 /// @Param. i_new. Must exist.
 /// @Note. Can't fail.
 static inline int pri(set_new_pair)(WMap *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id) {
@@ -293,7 +336,6 @@ static inline int pri(set_new_pair)(WMap *m, ID i_bucket_prev, ID i_new, KEY key
     return 0;
 }
 
-static inline bool pri(slot_is_empty(WMap *m, ID i)) { return !ID_valid(m->val_ids.items[ID_get(i)]); }
 
 /// @Note. Returns possible id where you should insert it.
 /// @Returns 0 if found. -1 if not.
@@ -527,7 +569,6 @@ bool pub(it_prev)(const WMap *m, pub(It) *it) {
     }
     return false;
 }
-
 
 
 
