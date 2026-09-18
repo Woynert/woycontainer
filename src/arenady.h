@@ -88,4 +88,26 @@ void *arenady_alloc(ArenaDy *a, i64 size, i64 align, i64 count)
 void arenady_reset_beginning(ArenaDy *a) { a->beg = a->root; }
 
 
+bool arenady__can_fit(ArenaDy *a, i64 size, i64 align, i64 count) {
+    ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
+    ptrdiff_t available = a->end - a->beg - padding;
+    return !(available <= 0 || count > available / size);
+}
+#define arenady_can_fit(arena, T, count)\
+    arenady__can_fit(arena, sizeof(T), _Alignof(T), count)
+
+
+/// Note: Read only, won't clean padding nor touch any byte.
+void *arenady_try_get(ArenaDy *a, i64 size, i64 align, i64 count)
+{
+    ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
+    ptrdiff_t available = a->end - a->beg - padding;
+    if (available <= 0 || count > available / size) { return NULL; }
+    void *p = a->beg + padding;
+    a->beg += padding + count * size;
+    return p;
+}
+#define arenady_try_get_one(arena, T) \
+    (T *)arenady_try_get(arena, sizeof(T), _Alignof(T), 1)
+
 #endif // !ARENADY_H

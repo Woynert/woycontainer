@@ -67,7 +67,6 @@ void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
     (T *)arena_alloc(arena, sizeof(T), _Alignof(T), (count))
 
 
-/*
 bool arena__can_fit(Arena *a, i64 size, i64 align, i64 count) {
     ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
     ptrdiff_t available = a->end - a->beg - padding;
@@ -75,6 +74,7 @@ bool arena__can_fit(Arena *a, i64 size, i64 align, i64 count) {
 }
 #define arena_can_fit(arena, T, count)\
     arena__can_fit(arena, sizeof(T), _Alignof(T), count)
+/*
 */
 
 
@@ -82,18 +82,13 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
     // New allocation: ptr == NULL && size > 0
     // Reallocation:   ptr != NULL && size > 0
     // Free:           ptr != NULL && size == 0
-
     if (size == 0) return NULL; // No freeing for arena.
-
     Arena *arena = (Arena*)user_data;
     void *result = arena_alloc(arena, sizeof(char), align, (i64)size);
-
     if (ptr != NULL) {
-        // Reallocation must copy what we had.
-        // Don't use memcpy.
         memmove(result, ptr, size);
+        // Reallocation must copy what we had. Don't use memcpy.
     }
-
     return result;
 }
 

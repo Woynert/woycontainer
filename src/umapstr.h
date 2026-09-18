@@ -76,8 +76,7 @@ int            pub(remove)    (Strumap *m, strview_t key_str);
 int            pub(pair_count)(const Strumap *m) { return m->umap.pair_count; }
 UMAPSTR__TYPE *pub(get)       (const Strumap *m, strview_t key_str);
 bool           pub(it_next)   (const Strumap *m, pub(It) *it);
-
-inline         pri(Umap__Bucket) *pri(hash_and_get_bucket)(const Strumap *m, strview_t key);
+static inline  pri(Umap__Bucket) *pri(hash_and_get_bucket)(const Strumap *m, strview_t key);
 
 
 int pub(create_with_allocator)(Strumap *m, UMAPSTR__ALLOC_PROTOTYPE(*allocator), void *user_data) {
@@ -102,7 +101,7 @@ void pub(free)(Strumap *m) {
 
 
 /// @Note. Cannot fail.
-inline pri(Umap__Bucket) *pri(hash_and_get_bucket)(const Strumap *m, strview_t key) {
+static inline pri(Umap__Bucket) *pri(hash_and_get_bucket)(const Strumap *m, strview_t key) {
     uint64_t hash = strumap__hash(key);
     int id = (int)(hash & (uint64_t)(m->umap.buckets.size - 1));
     return &m->umap.buckets.items[id];

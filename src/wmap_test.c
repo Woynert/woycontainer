@@ -2,6 +2,7 @@
 #include "portable_utils.h"
 #include "woytest.h"
 #include "arena.h"
+#include "arenady.h"
 
 #define DYNA__TYPE int
 #define DYNA__NAMESPACE Vec_Int
@@ -603,11 +604,68 @@ TEST test_auto(void) {
 }
 
 
+static Map_Int map_for_fuzzer;
+void LLVMFuzzerCleanup(void) { Map_Int_free(&map_for_fuzzer); }
+int LLVMFuzzerInitialize(int *argc, char ***argv) { (void)argc;(void)argv;atexit(LLVMFuzzerCleanup); return 0; }
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    static bool setup = false;
+    static Map_Int *m = &map_for_fuzzer;
+    if (!setup) {
+        setup = true;
+        Map_Int_create(m);
+    }
+
+    ArenaDy arena = { .root = (char*)data, .beg = (char*)data, .end = (char*)data + size };
+    const int *action = arenady_try_get_one(&arena, int);
+    if (!action) { return 0; }
+
+    switch (*action) {
+        case 0:
+        {
+            const int *key = arenady_try_get_one(&arena, int);
+            const int *value = arenady_try_get_one(&arena, int);
+            if (!key || !value) { break; }
+            Map_Int_upsert(m, *key, *value);
+            break;
+        }
+        case 1:
+        {
+            const int *key = arenady_try_get_one(&arena, int);
+            if (!key) { break; }
+            Map_Int_remove(m, *key);
+            break;
+        }
+        case 2:
+        {
+            const int *key = arenady_try_get_one(&arena, int);
+            if (!key) { break; }
+            Map_Int_get(m, *key);
+            break;
+        }
+        case 3:
+        {
+            Map_Int_It it = Map_Int_make_it(m);
+            while(Map_Int_it_next(m, &it)) { (void)0; }
+            break;
+        }
+        case 4:
+        {
+            Map_Int_It it = Map_Int_make_it_end(m);
+            while(Map_Int_it_prev(m, &it)) { (void)0; }
+            break;
+        }
+        default: break;
+    }
+    return 0;
+}
+
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 int main(void) {
     TESTS_INIT();
     RUN_TEST(test_manual);
     RUN_TEST(test_auto);
     TESTS_SHOW_RESULTS();
 }
+#endif
 
 

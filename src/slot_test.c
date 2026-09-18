@@ -22,7 +22,7 @@ void print_slot(const Fruit_Slot *s) {
     }
     printf("\nfruits           ");
     for (int i = 0; i < s->count; ++i) {
-        printf("%.4s ", s->items[i].name);
+        printf("%.4s ", s->_items[i].name);
     }
     printf("\n");
 }

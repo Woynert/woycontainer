@@ -28,20 +28,6 @@ typedef struct {
 #define ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
 ALLOC_PROTOTYPE(*allocator) = NULL;
 void *allocator_user_data = NULL;
-static void* arena_allocator(void* ptr, size_t size, int align, void* user_data) {
-    // New allocation: ptr == NULL && size > 0
-    // Reallocation:   ptr != NULL && size > 0
-    // Free:           ptr != NULL && size == 0
-    if (size == 0) return NULL; // No freeing for arena.
-    Arena *arena = (Arena*)user_data;
-    void *result = arena_alloc(arena, sizeof(char), align, (i64)size);
-    if (ptr != NULL) {
-        memmove(result, ptr, size);
-        // Reallocation must copy what we had. Don't use memcpy.
-    }
-    return result;
-}
-
 
 
 #define TEST_TEMPLATE(mymap, map_upsert, map_get, map_remove, map_count, COLOR)             \

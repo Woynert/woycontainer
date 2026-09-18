@@ -228,7 +228,7 @@ static inline int pri(set_new_pair)(WMap *m, ID node_prev, ID node_new, KEY key,
 int pri(rehash_if_needed)(WMap *old_m) {
     const float factor = (float)old_m->pair_count / (float)(1 << old_m->bucket_count_exp);
     if (factor < WMAP__REHASH_FACTOR) { return 0; }
-    printfd(ANSI_RED"REHASHING IS NEEDED!! (factor %f)", factor);
+    //printfd(ANSI_RED"REHASHING IS NEEDED!! (factor %f)", factor);
 
     // Create new map.
     WMap __new_map;
@@ -251,7 +251,6 @@ int pri(rehash_if_needed)(WMap *old_m) {
             goto quit_abort;
         }
         if (ID_get(i) >= (1 << new_m->capacity_exp)) {
-            printfd("growing");
             err = pri(grow_collision_storage)(new_m, new_m->capacity_exp + 1);
             if (err) { printferr("No memory?"); goto quit_abort; }
         }
@@ -294,7 +293,7 @@ static inline int pri(set_new_pair)(WMap *m, ID i_bucket_prev, ID i_new, KEY key
     return 0;
 }
 
-inline bool pri(slot_is_empty(WMap *m, ID i)) { return !ID_valid(m->val_ids.items[ID_get(i)]); }
+static inline bool pri(slot_is_empty(WMap *m, ID i)) { return !ID_valid(m->val_ids.items[ID_get(i)]); }
 
 /// @Note. Returns possible id where you should insert it.
 /// @Returns 0 if found. -1 if not.
@@ -333,11 +332,9 @@ int pub(upsert)(WMap *m, KEY key, TYPE item) {
     if (found) {
         // Update.
         pri(Slot_Value_update)(&m->values, ID_get(m->val_ids.items[ID_get(i)]), item);
-        printfd("Updated");
         return 0;
     }
     if (ID_get(i) >= (1 << m->capacity_exp)) {
-        printfd("growing");
         int err = pri(grow_collision_storage)(m, m->capacity_exp + 1);
         if (err) { return -1; }
     }

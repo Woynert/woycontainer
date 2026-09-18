@@ -1,4 +1,3 @@
-
 # Library.
 
 project('woycontainer', 'c', default_options : ['c_std=gnu11'])
@@ -7,11 +6,22 @@ woycontainer_dep = declare_dependency(
   include_directories: woycontainer_includes
 )
 
+# DEBUG note: All of these debug options are set (albeit implicitely)
+# in the Makefile. Check "make mesonSetupDebug".
+# Compiler args:
+#   -g
+#   -fsanitize=address,undefined
+#   -fno-omit-frame-pointer
+#   -Og
+# Linker args:
+#   -fsanitize=address,undefined
+#   -rdynamic   <-- NOT set by meson.
+
 # Tests.
 
 if not meson.is_subproject()
 
-  warning_flags = [
+  MY_WARNINGS = [
     '-Wall',
     '-Wextra',
     #'-Wpedantic', # I removed it because I want gnu-statement-expression.
@@ -26,16 +36,8 @@ if not meson.is_subproject()
     '-Wno-unused-function',
     '-Wno-gnu-statement-expression',
   ]
-  san_flags = [
-    '-fsanitize=address,undefined',
-    '-fno-omit-frame-pointer',
-    '-g',
-    '-O1', # O1 supposedly better than O0 or O2 for debug.
-  ]
-  link_flags = ['-fsanitize=address,undefined']
 
-  add_project_arguments(warning_flags + san_flags, language: 'c')
-  add_project_link_arguments(link_flags, language: 'c')
+  add_project_arguments(MY_WARNINGS, language: 'c')
 
   arena_test = executable('arena_test', './src/arena_test.c')
   test('arena_test', arena_test)
@@ -79,5 +81,8 @@ if not meson.is_subproject()
   wmap_test = executable('wmap_test', './src/wmap_test.c')
   test('wmap_test', wmap_test)
 
+  wmap_test_fuzzy = executable('wmap_test_fuzzy', './src/wmap_test.c',
+    c_args: ['-fsanitize=fuzzer', '-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION'],
+    link_args: '-fsanitize=fuzzer',)
 endif
 
