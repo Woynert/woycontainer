@@ -2,6 +2,6 @@
 
 make mesonSetupDebugClang
 make compile
-./build/wmap_test_fuzzy --runs=100
+./build/wmap_test_fuzzy -runs=1000
 make coverage
 make coverageClean # <- To start from fresh state.

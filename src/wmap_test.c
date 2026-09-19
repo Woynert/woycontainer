@@ -68,11 +68,11 @@ int both_maps_upsert(Map_Int *a, NaiveMap *b, int key, int item) {
 void both_maps_remove(Map_Int *a, NaiveMap *b, int key) {
     Map_Int_remove(a, key); naive_map_remove(b, key);
 }
-int both_maps_get(Map_Int *a, NaiveMap *b, int key, bool *out_equal) {
+int *both_maps_get(Map_Int *a, NaiveMap *b, int key, bool *out_equal) {
     int *result_a = Map_Int_get(a, key);
     int *result_b = naive_map_get(b, key);
-    *out_equal = (*result_b == *result_a);
-    return *result_a;
+    *out_equal = (result_a == NULL && result_a == result_b) || (*result_a == *result_b);
+    return result_a;
 }
 bool both_maps_compare_order_and_contents(Map_Int *a, NaiveMap *b) {
     if (Map_Int_pair_count(a) != b->pairs.size
@@ -434,9 +434,9 @@ TEST test_manual(void) {
         map_print_order(m, true);
         printfd("---");
         for (int i = 0; i < 100; ++i) {
-            /*int a = rand_range(m->bucket_count, (m->bucket_count) + m->collision_count-1);*/
-            /*int b = rand_range(m->bucket_count, (m->bucket_count) + m->collision_count-1);*/
-            /*Map_Int__swap_nodes_diff_bucket(m, ID_make(a), ID_make(b));*/
+            int a = rand_range(m->table.bucket_count, (m->table.bucket_count) + m->table.collision_count-1);
+            int b = rand_range(m->table.bucket_count, (m->table.bucket_count) + m->table.collision_count-1);
+            Map_Int__Table__swap_nodes_diff_bucket(&m->table, ID_make(a), ID_make(b));
         }
         printfd("---");
         map_print(m);
@@ -605,14 +605,25 @@ TEST test_auto(void) {
 
 
 static Map_Int map_for_fuzzer;
-void LLVMFuzzerCleanup(void) { Map_Int_free(&map_for_fuzzer); }
-int LLVMFuzzerInitialize(int *argc, char ***argv) { (void)argc;(void)argv;atexit(LLVMFuzzerCleanup); return 0; }
+static NaiveMap nm_for_fuzzer;
+void LLVMFuzzerCleanup(void) {
+    Map_Int_free(&map_for_fuzzer); naive_map_free(&nm_for_fuzzer);
+}
+int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    (void)argc,(void)argv; atexit(LLVMFuzzerCleanup); return 0;
+}
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /*
+        @Note: This fuzz tests runs the same operations on WMap and on NaiveMap,
+        after each operation it's verified they contain same order and contents.
+       */
     static bool setup = false;
     static Map_Int *m = &map_for_fuzzer;
+    static NaiveMap *nm = &nm_for_fuzzer;
     if (!setup) {
         setup = true;
         Map_Int_create(m);
+        nm_for_fuzzer = naive_map_create();
     }
 
     ArenaDy arena = { .root = (char*)data, .beg = (char*)data, .end = (char*)data + size };
@@ -625,21 +636,27 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
             const int *key = arenady_try_get_one(&arena, int);
             const int *value = arenady_try_get_one(&arena, int);
             if (!key || !value) { break; }
-            Map_Int_upsert(m, *key, *value);
+            int err = both_maps_upsert(m, nm, *key, *value);
+            wassert_live(err == 0);
+            wassert_live(both_maps_compare_order_and_contents(m, nm));
             break;
         }
         case 1:
         {
             const int *key = arenady_try_get_one(&arena, int);
             if (!key) { break; }
-            Map_Int_remove(m, *key);
+            both_maps_remove(m, nm, *key);
+            wassert_live(both_maps_compare_order_and_contents(m, nm));
             break;
         }
         case 2:
         {
             const int *key = arenady_try_get_one(&arena, int);
             if (!key) { break; }
-            Map_Int_get(m, *key);
+            bool equal = false;
+            both_maps_get(m, nm, *key, &equal);
+            wassert_live(equal);
+            wassert_live(both_maps_compare_order_and_contents(m, nm));
             break;
         }
         case 3:

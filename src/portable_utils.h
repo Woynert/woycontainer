@@ -135,6 +135,8 @@ static int int_digit_places (int n) {
 
 #define wstatic_assert(x) static_assert(x, #x)
 
+#define wassert_live wassert
+
 #define printfd(fmt, ...) \
     do { \
         printf(ANSI_YEL fmt, ##__VA_ARGS__); \
