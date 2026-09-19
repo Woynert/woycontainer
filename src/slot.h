@@ -48,6 +48,23 @@ typedef struct Slot {
 } Slot;
 
 
+
+int    pfx(create)(Slot *s);
+int    pfx(create_with_allocator)(Slot *s, SLOT__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data);
+void   pfx(free)(Slot *s);
+void   pfx(clear)(Slot *s);
+int    pfx(append)(Slot *s, TYPE item);
+TYPE * pfx(get)(const Slot *s, int user_id);
+int    pfx(get_next_id)(const Slot *s);
+int    pfx(update)(const Slot *s, int user_id, TYPE item);
+int    pfx(pop)(Slot *s, int user_id);
+void   pfx(print_debug)(const Slot *s);
+size_t pfx(report_memory)(const Slot *s);
+int    pfx(_grow)(Slot *s, int new_capacity);
+static SLOT__ALLOC_PROTOTYPE(pfx(_default_allocator));
+
+
+
 // @Returns error.
 int pfx(_grow)(Slot *s, int new_capacity) {
 
@@ -125,6 +142,10 @@ int pfx(append)(Slot *s, TYPE item) {
     ++s->count;
     return s->itemid_to_userid[item_id];
 }
+
+
+/// @Returns would-be next id if a new item where to be inserted.
+int pfx(get_next_id)(const Slot *s) { return s->itemid_to_userid[s->count]; }
 
 
 // @Returns TYPE or NULL if not found.

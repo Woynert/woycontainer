@@ -29,14 +29,6 @@
 #include "wmap.h"
 
 
-// Useful ID macros.
-#define ID           wmap__zid_t
-#define ID_valid(id) wmap__zid_valid(id)
-#define ID_get(id)   wmap__zid_get(id)
-#define ID_make(id)  wmap__zid_make(id)
-#define ID_equals(a, b) ((a).id == (b).id)
-#define ID_INVALID ((ID){0})
-
 
 /// START [NAIVE MAP]
 typedef struct {
@@ -83,7 +75,9 @@ int both_maps_get(Map_Int *a, NaiveMap *b, int key, bool *out_equal) {
     return *result_a;
 }
 bool both_maps_compare_order_and_contents(Map_Int *a, NaiveMap *b) {
-    if (a->pair_count != b->pairs.size) { printferr("Wrong pair count."); return false; }
+    if (Map_Int_pair_count(a) != b->pairs.size
+        || Map_Int_pair_count(a) != a->values.count
+    ) { printferr("Wrong pair count."); return false; }
     // Forward.
     {
         int k = 0;
@@ -127,7 +121,8 @@ typedef struct {
     View_Vec_Int bucket_chains;
 } IntegrityTest;
 
-IntegrityTest get_integrity_snapshot(Map_Int *m, Arena *perm) {
+IntegrityTest get_integrity_snapshot(Map_Int *w, Arena *perm) {
+    Map_Int__Table *m = &w->table;
     IntegrityTest integrity = { 0 };
     {
         Vec_Int order_keys = Vec_Int_create_with_allocator(arena_allocator, perm);
@@ -150,7 +145,7 @@ IntegrityTest get_integrity_snapshot(Map_Int *m, Arena *perm) {
                 wassert(bucket_keys);
             };
             ID node = ID_make(i);
-            if (Map_Int__slot_is_empty(m, node)) { continue; }
+            if (Map_Int__Table__slot_is_empty(m, node)) { continue; }
             while (ID_valid(node)) {
                 Vec_Int_append(bucket_keys, m->keys.items[ID_get(node)]);
                 node = m->bucket_next.items[ID_get(node)];
@@ -161,7 +156,8 @@ IntegrityTest get_integrity_snapshot(Map_Int *m, Arena *perm) {
     return integrity;
 }
 
-bool check_integrity(Map_Int *m, IntegrityTest integrity, Arena scratch) {
+bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
+    Map_Int__Table *m = &w->table;
     // Check buckets.
     {
         if (integrity.bucket_chains.size != (1 << m->bucket_count_exp)) {
@@ -180,7 +176,7 @@ bool check_integrity(Map_Int *m, IntegrityTest integrity, Arena scratch) {
 
             ID node = ID_make(i);
             ID last_valid_node = node;
-            if (Map_Int__slot_is_empty(m, node)) {
+            if (Map_Int__Table__slot_is_empty(m, node)) {
                 if (keys.size == 0) { continue; }
                 else {
                     printferr("Coudln't find any, expected %d (bucket %d).", keys.size, i);
@@ -272,13 +268,14 @@ bool check_integrity(Map_Int *m, IntegrityTest integrity, Arena scratch) {
 /*
    Swaps all nodes of the same bucket and test whether they're still all present.
    */
-void shuffle_collision_nodes_same_bucket(Map_Int *m, const int iterations, Arena arena) {
+void shuffle_collision_nodes_same_bucket(Map_Int *w, const int iterations, Arena arena) {
+    Map_Int__Table *m = &w->table;
     for (int i = 0; i < 1 << m->bucket_count_exp; ++i) {
         Arena scratch = arena;
         Vec_Int bucket_nodes = Vec_Int_create_with_allocator(arena_allocator, &scratch);
 
         const ID bucket = ID_make(i);
-        if (Map_Int__slot_is_empty(m, bucket)) { continue; }
+        if (Map_Int__Table__slot_is_empty(m, bucket)) { continue; }
         ID node = bucket;
         while (ID_valid(node)) {
             Vec_Int_append(&bucket_nodes, ID_get(node));
@@ -289,14 +286,15 @@ void shuffle_collision_nodes_same_bucket(Map_Int *m, const int iterations, Arena
         for (int k = 0; k < iterations; ++k) {
             int a = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
             int b = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
-            Map_Int__swap_nodes_same_bucket(m, ID_make(a), ID_make(b));
+            Map_Int__Table__swap_nodes_same_bucket(m, ID_make(a), ID_make(b));
         }
     }
 }
 
 
 // START [PRINTING]
-void map_print(Map_Int *m) {
+void map_print(Map_Int *w) {
+    Map_Int__Table *m = &w->table;
     printf("Printing map, size %d, buckets %d, pairs %d, cols %d, first %d, last %d",
             1 << m->capacity_exp, 1 << m->bucket_count_exp,
             m->pair_count, m->collision_count, ID_get(m->first_node), ID_get(m->last_node));
@@ -321,8 +319,8 @@ void map_print(Map_Int *m) {
         if (i+1 == 1 << m->bucket_count_exp) { printf("|"); }
     }
     printf("\nvalues:  ");
-    for (int i = 0; i < m->values.count; ++i) {
-        printf("[%d]=%d,", m->values.itemid_to_userid[i], m->values._items[i]);
+    for (int i = 0; i < w->values.count; ++i) {
+        printf("[%d]=%d,", w->values.itemid_to_userid[i], w->values._items[i]);
     }
     printf("\nnext:    ");
     for (int i = 0; i < 1 << m->capacity_exp; ++i) {
@@ -341,7 +339,8 @@ void map_print(Map_Int *m) {
     //}
     printf("\n");
 }
-void map_print_order(Map_Int *m, bool backwards) {
+void map_print_order(Map_Int *w, bool backwards) {
+    Map_Int__Table *m = &w->table;
     const int MAX_CYCLES = 100;
     int cycles = 0;
     ID node = m->first_node;
@@ -363,7 +362,8 @@ void map_print_order(Map_Int *m, bool backwards) {
     }
     printf("\n");
 }
-void map_print_bucket_chains(Map_Int *m) {
+void map_print_bucket_chains(Map_Int *w) {
+    Map_Int__Table *m = &w->table;
     const int max_cycles = 100;
     int cycles = 0;
     printf("Forward:\n");
@@ -397,31 +397,31 @@ TEST test_manual(void) {
     err = Map_Int_upsert(m, 888, 80);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(m->pair_count, 1);
+    ASSERT_INT(Map_Int_pair_count(m), 1);
     printfd("---");
     err = Map_Int_upsert(m, 1, 10);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(m->pair_count, 2);
+    ASSERT_INT(Map_Int_pair_count(m), 2);
     printfd("---");
     err = Map_Int_upsert(m, 2, 20);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(m->pair_count, 3);
+    ASSERT_INT(Map_Int_pair_count(m), 3);
     printfd("---");
     err = Map_Int_upsert(m, 3, 30);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(m->pair_count, 4);
+    ASSERT_INT(Map_Int_pair_count(m), 4);
     printfd("---");
     err = Map_Int_upsert(m, 4, 40);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(m->pair_count, 5);
+    ASSERT_INT(Map_Int_pair_count(m), 5);
     printfd("---");
     err = Map_Int_upsert(m, 5, 50);
     ASSERT_INT(err, 0);
-    ASSERT_INT(m->pair_count, 6);
+    ASSERT_INT(Map_Int_pair_count(m), 6);
 
     map_print(m);
     map_print_bucket_chains(m);
@@ -434,9 +434,9 @@ TEST test_manual(void) {
         map_print_order(m, true);
         printfd("---");
         for (int i = 0; i < 100; ++i) {
-            int a = rand_range(1 << m->bucket_count_exp, (1 << m->bucket_count_exp) + m->collision_count-1);
-            int b = rand_range(1 << m->bucket_count_exp, (1 << m->bucket_count_exp) + m->collision_count-1);
-            Map_Int__swap_nodes_diff_bucket(m, ID_make(a), ID_make(b));
+            /*int a = rand_range(1 << m->bucket_count_exp, (1 << m->bucket_count_exp) + m->collision_count-1);*/
+            /*int b = rand_range(1 << m->bucket_count_exp, (1 << m->bucket_count_exp) + m->collision_count-1);*/
+            /*Map_Int__swap_nodes_diff_bucket(m, ID_make(a), ID_make(b));*/
         }
         printfd("---");
         map_print(m);

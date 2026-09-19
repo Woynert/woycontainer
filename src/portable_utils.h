@@ -228,4 +228,23 @@ int rand_range(int min, int max) {
 }
 // END [RANDOM NUMBERS]
 
+
+
+
+// START [ID]
+typedef struct {
+    int id;
+} zid_t;
+inline int   zid_get(zid_t id)   { return id.id -1; }
+inline zid_t zid_make(int id)    { return (zid_t) { id +1 }; }
+inline bool  zid_valid(zid_t id) { return id.id > 0; }
+#define ID           zid_t
+#define ID_valid(id) zid_valid(id)
+#define ID_get(id)   zid_get(id)
+#define ID_make(id)  zid_make(id)
+#define ID_equals(a, b) ((a).id == (b).id)
+#define ID_INVALID ((ID){0})
+// END [ID]
+
+
 #endif

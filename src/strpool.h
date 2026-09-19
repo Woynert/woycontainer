@@ -86,6 +86,7 @@ STRPOOL_STR  strpool_get_from_view(const Strpool *p, strpool__view view);
 int          strpool_remove(Strpool *p, int view_id);
 size_t       strpool_report_memory(const Strpool *p);
 void         strpool_clear(Strpool *p);
+int          strpool_get_next_id(Strpool *p);
 
 int            strpool__grow(Strpool *p, int min_size);
 strpool__Node *strpool__get_node(const Strpool *p, int i);
@@ -320,6 +321,10 @@ int strpool_append(Strpool *p, STRPOOL_STR view) {
     new_view->size = view.size;
     return view_id;
 }
+
+
+/// @Returns would-be next id if a new String where to be inserted.
+int strpool_get_next_id(Strpool *p) { return strpool__view_Slot_get_next_id(&p->views); }
 
 
 int strpool_remove(Strpool *p, int view_id) {
