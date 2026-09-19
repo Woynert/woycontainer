@@ -95,7 +95,7 @@ inline uint64_t wmap__hash(char *data, int size) {
 #define TYPE WMAP__TYPE
 #define WMap WMAP__NAMESPACE
 #define WMAP__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
-#define WMAP__DEFAULT_SIZE_EXP 8
+#define WMAP__DEFAULT_SIZE 8
 #define WMAP__REHASH_FACTOR 0.9
 #define WMAP__MAX_COUNT (INT_MAX -2)
 
@@ -130,29 +130,20 @@ int     pub(pair_count)(const WMap *m) { return m->table.pair_count; }
 
 int  pri(rehash_if_needed)(WMap *old_m);
 int  pri(find)(WMap *m, KEY key, ID *out_prev_id, ID *out_id);
-void pri(init)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
 bool pri(default_equal)(KEY a, KEY b, void *data) { (void)data; return 0 == memcmp(&a, &b, sizeof(a)); }
 uint64_t pri(default_hash)(KEY k, void *data) { (void)data; return wmap__hash((char*)&k, sizeof(k)); }
 
 
 
-/// @Note: Init doesn't allocate anything (keep it like that).
-void pri(init)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
-    *m = (WMap) { 0 };
-    pri(Table__init)(&m->table, allocator, allocator_userdata);
-    pri(Slot_Value_create_with_allocator)(&m->values, allocator, allocator_userdata);
-}
-
 /// @Returns error.
 int pub(create_with_allocator)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
-    pri(init)(m, allocator, allocator_userdata);
+    *m = (WMap) { 0 };
     pri(Table_create_with_allocator)(&m->table, allocator, allocator_userdata);
+    pri(Slot_Value_create_with_allocator)(&m->values, allocator, allocator_userdata);
     return 0;
 }
 
-int pub(create)(WMap *m) {
-    return pub(create_with_allocator)(m, NULL, NULL);
-}
+int pub(create)(WMap *m) { return pub(create_with_allocator)(m, NULL, NULL); }
 
 void pub(free)(WMap *m) {
     pri(Table_free)(&m->table);
@@ -161,45 +152,42 @@ void pub(free)(WMap *m) {
 }
 
 
-static inline int pri(table_get_bucket)(pri(Table) *t, uint64_t hash) {
-    int bucket_id = (int)(hash & (uint64_t)((1 << t->bucket_count_exp) - 1));
-    return bucket_id;
+static inline ID pri(table_get_bucket)(pri(Table) *t, uint64_t hash) {
+    return t->bucket_count == 0 ? ID_INVALID : ID_make((int)(hash & (uint64_t)(t->bucket_count - 1)));
+    // bucket_count must be power of 2.
 }
 
 
 int pri(rehash_if_needed)(WMap *old_m) {
     pri(Table) *old_table = &old_m->table;
-    const float factor = (float)old_table->pair_count / (float)(1 << old_table->bucket_count_exp);
-    if (factor < WMAP__REHASH_FACTOR) { return 0; }
+    int new_bucket_count = old_table->bucket_count * 2;
+    if (new_bucket_count == 0) { new_bucket_count = WMAP__DEFAULT_SIZE; }
+    else {
+        const float factor = (float)old_table->pair_count / (float)old_table->bucket_count;
+        if (factor < WMAP__REHASH_FACTOR) { return 0; }
+    }
 
     // Create new map.
     WMap __new_map;
     WMap *new_m = &__new_map;
-    pri(init)(new_m, old_table->keys.allocator, old_table->keys.allocator_userdata);
-    int err = pri(Table__allocate_direct_storage)(&new_m->table, new_m->table.bucket_count_exp +1);
-    if (err) { pub(free)(new_m); return -1; }
-    new_m->table.bucket_count_exp = new_m->table.capacity_exp;
+    pub(create_with_allocator)(new_m, old_table->keys.allocator, old_table->keys.allocator_userdata);
+    int err = pri(Table_grow)(&new_m->table, new_bucket_count);
+    if (err) { pub(free)(new_m); printferr("OOM?"); return -1; }
+    new_m->table.bucket_count = new_m->table.capacity;
     new_m->userdata = old_m->userdata;
 
     // Rehash keys.
     pub(It) it = pub(make_it)(old_m);
     while (pub(it_next)(old_m, &it)) {
         // @Note: Keep this procedure in sync with 'upsert' function.
-        uint64_t hash = WMAP__KEY_HASH(it.key, new_m->userdata);
-        ID bucket_id = ID_make(pri(table_get_bucket)(&new_m->table, hash));
-        ID i_prev = { 0 };
-        ID i = bucket_id;
+        ID i_prev = ID_INVALID, i = ID_INVALID;
         bool found = 0 == pri(find)(new_m, it.key, &i, &i_prev);
-        if (found) {
-            printferr("wtf: Key already exists. Should never happen.");
-            goto quit_abort;
+        if (found) { printferr("wtf: Key already exists."); goto quit_abort; }
+        if (ID_get(i) >= new_m->table.capacity) {
+            err = pri(Table_grow)(&new_m->table, new_m->table.capacity * 2);
+            if (err) { printferr("OOM?"); goto quit_abort; }
         }
-        if (ID_get(i) >= (1 << new_m->table.capacity_exp)) {
-            err = pri(Table__grow_collision_storage)(&new_m->table, new_m->table.capacity_exp + 1);
-            if (err) { printferr("No memory?"); goto quit_abort; }
-        }
-        pri(Table__set_new_pair)(&new_m->table, i_prev, i, it.key, it.__value_id);
-        if (ID_get(i) >= (1 << new_m->table.bucket_count_exp)) { ++new_m->table.collision_count; }
+        pri(Table_set_new_pair)(&new_m->table, i_prev, i, it.key, it.__value_id);
     }
 
     // Swap data and free.
@@ -216,32 +204,27 @@ int pri(rehash_if_needed)(WMap *old_m) {
 }
 
 
-/// @Note. On this level of abstraction this has no business determining
-///        The offset for the collision index.
-///
-/// @Note. Returns possible id where you should insert it.
+/// @Param[out] out_id. If found, corresponding id, else id where you should insert it.
 /// @Param[out] out_prev_id. Optional.
 /// @Returns 0 if found. -1 if not.
 int pri(find)(WMap *m, KEY key, ID *out_id, ID *out_prev_id) {
-    ID bucket = ID_make(pri(table_get_bucket)(&m->table, WMAP__KEY_HASH(key, m->userdata)));
-    ID i_prev = ID_INVALID;
-    ID i = bucket;
-    if (!pri(Table__slot_is_empty)(&m->table, bucket)) {
-        while (ID_valid(i)) {
-            if (WMAP__KEY_EQUAL(m->table.keys.items[ID_get(i)], key, m->userdata)) {
-                *out_id = i;
-                if (out_prev_id) { *out_prev_id = i_prev; }
+    ID prev_id = ID_INVALID;
+    ID id = pri(table_get_bucket)(&m->table, WMAP__KEY_HASH(key, m->userdata));
+    do {
+        if (!ID_valid(id) || pri(Table_slot_is_empty)(&m->table, id)) { break; }
+        do {
+            if (WMAP__KEY_EQUAL(m->table.keys.items[ID_get(id)], key, m->userdata)) {
+                if (out_prev_id) { *out_prev_id = prev_id; }
+                *out_id = id;
                 return 0;
             }
-            i_prev = i;
-            i = m->table.bucket_next.items[ID_get(i)];
-        }
-    }
-    if ((!ID_valid(i)) || (ID_valid(i) && !pri(Table__slot_is_empty)(&m->table, i))) {
-        i = ID_make((1 << m->table.bucket_count_exp) + m->table.collision_count);
-    }
-    *out_id = i;
-    if (out_prev_id) { *out_prev_id = i_prev; }
+            prev_id = id;
+            id = m->table.bucket_next.items[ID_get(id)];
+        } while(ID_valid(id));
+    } while(0);
+    id = pri(Table_if_invalid_get_next_valid_id)(&m->table, id);
+    if (out_prev_id) { *out_prev_id = prev_id; }
+    *out_id = id;
     return -1;
 }
 
@@ -256,15 +239,15 @@ int pub(upsert)(WMap *m, KEY key, TYPE item) {
         pri(Slot_Value_update)(&m->values, ID_get(m->table.val_ids.items[ID_get(i)]), item);
         return 0;
     }
-    if (ID_get(i) >= (1 << m->table.capacity_exp)) {
-        int err = pri(Table__grow_collision_storage)(&m->table, m->table.capacity_exp + 1);
+    if (ID_get(i) >= m->table.capacity) {
+        int new_cap = m->table.capacity == 0 ? WMAP__DEFAULT_SIZE : m->table.capacity * 2;
+        int err = pri(Table_grow)(&m->table, new_cap);
         if (err) { return -1; }
     }
     ID value_id = ID_make(pri(Slot_Value_append)(&m->values, item));
-    if (!ID_valid(value_id)) { return -1; }
-    pri(Table__set_new_pair)(&m->table, i_prev, i, key, value_id);
-    if (ID_get(i) >= (1 << m->table.bucket_count_exp)) { ++m->table.collision_count; }
-    if (pri(rehash_if_needed)(m)) { printferr("W: Rehashing failed."); }
+    if (!ID_valid(value_id)) { printferr("OOM?."); return -1; }
+    pri(Table_set_new_pair)(&m->table, i_prev, i, key, value_id);
+    if (pri(rehash_if_needed)(m)) { printfd("W: Rehashing failed."); }
     return 0;
 }
 
@@ -321,6 +304,6 @@ bool pub(it_prev)(const WMap *m, pub(It) *it) {
 #undef TYPE
 #undef WMap
 #undef WMAP__ALLOC_PROTOTYPE
-#undef WMAP__DEFAULT_SIZE_EXP
+#undef WMAP__DEFAULT_SIZE
 #undef WMAP__REHASH_FACTOR
 #undef WMAP__MAX_COUNT

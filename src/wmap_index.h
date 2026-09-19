@@ -69,8 +69,8 @@ typedef struct {
     pri(Arr_Int) bucket_next;
     pri(Arr_Int) bucket_prev;
 
-    int capacity_exp;
-    int bucket_count_exp;
+    int capacity;
+    int bucket_count;
 
     int pair_count;        // Amount of pairs in total.
     int collision_count;   // Amount of pairs in 'collision storage'.
@@ -91,19 +91,19 @@ int     pub(create)(WMapIndex *m);
 int     pub(create_with_allocator)(WMapIndex *m, WMAPINDEX__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
 void    pub(free)(WMapIndex *m);
 void    pub(remove)(WMapIndex *m, ID i);
-void pri(init)(WMapIndex *m, WMAPINDEX__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
-void pri(clear)(WMapIndex *m, int from, int to);
-int pri(allocate_direct_storage)(WMapIndex *m, int cap_exp);
-int pri(grow_collision_storage)(WMapIndex *m, int new_cap_exp);
-static inline int pri(set_new_pair)(WMapIndex *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id);
-void pri(swap_nodes_same_bucket)(WMapIndex *m, const ID a, const ID b);
-void pri(swap_nodes_diff_bucket)(WMapIndex *m, ID a, ID b);
-static inline bool pri(slot_is_empty(const WMapIndex *m, ID i)) { return !ID_valid(m->val_ids.items[ID_get(i)]); }
+int     pub(grow)(WMapIndex *m, int new_cap);
+static inline int pub(set_new_pair)(WMapIndex *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id);
+static inline bool pub(slot_is_empty(const WMapIndex *m, ID i)) { return !ID_valid(m->val_ids.items[ID_get(i)]); }
+
+void    pri(clear)(WMapIndex *m, int from, int to);
+void    pri(swap_nodes_same_bucket)(WMapIndex *m, const ID a, const ID b);
+void    pri(swap_nodes_diff_bucket)(WMapIndex *m, ID a, ID b);
+static inline ID  pub(if_invalid_get_next_valid_id)(WMapIndex *m, ID i);
 
 
-
-/// @Note: Init doesn't allocate anything (keep it like that).
-void pri(init)(WMapIndex *m, WMAPINDEX__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
+/// @Note. Doesn't allocate on creation. Aka default capacity is 0.
+/// @Returns error.
+int pub(create_with_allocator)(WMapIndex *m, WMAPINDEX__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
     *m = (WMapIndex) { 0 };
     m->keys        = pri(Arr_Key_create_with_allocator)(allocator, allocator_userdata);
     m->next        = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
@@ -111,19 +111,10 @@ void pri(init)(WMapIndex *m, WMAPINDEX__ALLOC_PROTOTYPE(*allocator), void *alloc
     m->bucket_next = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
     m->bucket_prev = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
     m->val_ids     = pri(Arr_Int_create_with_allocator)(allocator, allocator_userdata);
-}
-
-/// @Returns error.
-int pub(create_with_allocator)(WMapIndex *m, WMAPINDEX__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata) {
-    pri(init)(m, allocator, allocator_userdata);
-    if (pri(allocate_direct_storage)(m, 1)) { return -1; }  // DEFAULT CAPACITY
-    m->bucket_count_exp = m->capacity_exp;                  // DEFAULT BUCKETS
     return 0;
 }
 
-int pub(create)(WMapIndex *m) {
-    return pub(create_with_allocator)(m, NULL, NULL);
-}
+int pub(create)(WMapIndex *m) { return pub(create_with_allocator)(m, NULL, NULL); }
 
 void pub(free)(WMapIndex *m) {
     pri(Arr_Key_destroy)(&m->keys);
@@ -144,50 +135,32 @@ void pri(clear)(WMapIndex *m, int from, int to) {
     memset(m->bucket_prev.items  + from, 0, sizeof(m->bucket_prev.items[0]) * (size_t)(to - from));
 }
 
-// @Note: Only call on newly created maps.
-int pri(allocate_direct_storage)(WMapIndex *m, int cap_exp) {
-    wassert(m->capacity_exp == 0);
-    int size = 1 << cap_exp;
-    if (pri(Arr_Key_resize)(&m->keys, size))          { return -1; }
-    if (pri(Arr_Int_resize)(&m->next, size))          { return -1; }
-    if (pri(Arr_Int_resize)(&m->prev, size))          { return -1; }
-    if (pri(Arr_Int_resize)(&m->bucket_next, size))   { return -1; }
-    if (pri(Arr_Int_resize)(&m->bucket_prev, size))   { return -1; }
-    if (pri(Arr_Int_resize)(&m->val_ids, size))       { return -1; }
-    if (pri(Arr_Int_resize)(&m->val_ids, size))       { return -1; }
-    pri(clear)(m, 0, size);
-    m->capacity_exp = cap_exp;
-    return 0;
-}
 
-// @Note: The difference between this and 'allocate_direct_storage' is
-//        this can be called more than once.
-// @Note: Actually things have changed. They should be able to merge now.
-int pri(grow_collision_storage)(WMapIndex *m, int new_cap_exp) {
-    int size = 1 << m->capacity_exp;
-    int new_size = 1 << new_cap_exp;
-    if (pri(Arr_Key_resize)(&m->keys, new_size))       { return -1; }
-    if (pri(Arr_Int_resize)(&m->next, new_size))       { return -1; }
-    if (pri(Arr_Int_resize)(&m->prev, new_size))       { return -1; }
-    if (pri(Arr_Int_resize)(&m->bucket_next, new_size)){ return -1; }
-    if (pri(Arr_Int_resize)(&m->bucket_prev, new_size)){ return -1; }
-    if (pri(Arr_Int_resize)(&m->val_ids, new_size))    { return -1; }
-    if (pri(Arr_Int_resize)(&m->val_ids, new_size))    { return -1; }
-    pri(clear)(m, size, new_size);
-    m->capacity_exp = new_cap_exp;
+int pub(grow)(WMapIndex *m, int new_cap) {
+    if (pri(Arr_Key_resize)(&m->keys, new_cap))       { return -1; }
+    if (pri(Arr_Int_resize)(&m->next, new_cap))       { return -1; }
+    if (pri(Arr_Int_resize)(&m->prev, new_cap))       { return -1; }
+    if (pri(Arr_Int_resize)(&m->bucket_next, new_cap)){ return -1; }
+    if (pri(Arr_Int_resize)(&m->bucket_prev, new_cap)){ return -1; }
+    if (pri(Arr_Int_resize)(&m->val_ids, new_cap))    { return -1; }
+    if (pri(Arr_Int_resize)(&m->val_ids, new_cap))    { return -1; }
+    pri(clear)(m, m->capacity, new_cap);
+    m->capacity = new_cap;
     return 0;
 }
 
 
-
-
-
+static inline ID pub(if_invalid_get_next_valid_id)(WMapIndex *m, ID i) {
+    return ((!ID_valid(i)) || (ID_valid(i) && !pub(slot_is_empty)(m, i))) ?
+        ID_make(m->bucket_count + m->collision_count) :
+        i;
+}
 
 
 /// @Param. i_bucket_prev. Can be invalid.
 /// @Param. i_new. Must exist.
 /// @Note. Can't fail.
-static inline int pri(set_new_pair)(WMapIndex *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id) {
+static inline int pub(set_new_pair)(WMapIndex *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id) {
     if (m->pair_count == 0) { m->first_node = i_new; }
     if (ID_valid(i_bucket_prev)) {
         m->bucket_next.items[ID_get(i_bucket_prev)] = i_new;
@@ -202,9 +175,9 @@ static inline int pri(set_new_pair)(WMapIndex *m, ID i_bucket_prev, ID i_new, KE
     m->val_ids.items[ID_get(i_new)] = value_id;
     m->last_node = i_new;
     ++m->pair_count;
+    if (ID_get(i_new) >= m->bucket_count) { ++m->collision_count; }
     return 0;
 }
-
 
 
 void pri(swap_nodes_same_bucket)(WMapIndex *m, const ID a, const ID b) {
@@ -311,13 +284,13 @@ void pri(swap_nodes_diff_bucket)(WMapIndex *m, ID a, ID b) {
 void pub(remove)(WMapIndex *m, ID i) {
 
     // 1. If 'in direct' and has bucket_next -> Swap node to next in it's bucket.
-    if (ID_get(i) < (1 << m->bucket_count_exp) && ID_valid(m->bucket_next.items[ID_get(i)])) {
+    if (ID_get(i) < m->bucket_count && ID_valid(m->bucket_next.items[ID_get(i)])) {
         pri(swap_nodes_same_bucket)(m, i, m->bucket_next.items[ID_get(i)]);
         i = m->bucket_next.items[ID_get(i)];
     }
     // 2. If not 'in direct' -> Swap node to vector end.
-    if (ID_get(i) >= (1 << m->bucket_count_exp)) {
-        ID end = ID_make((1 << m->bucket_count_exp) + m->collision_count-1);
+    if (ID_get(i) >= m->bucket_count) {
+        ID end = ID_make(m->bucket_count + m->collision_count-1);
         pri(swap_nodes_diff_bucket)(m, i, end);
         i = end;
         --m->collision_count;
