@@ -90,7 +90,12 @@ static int int_digit_places (int n) {
     return 10;
 }
 
-// #define PYTHON_MODULO(n, M) ((((n) % (M)) + (M)) % (M))
+/// @note: Rename this function.
+/// Python -> Floored modulo or True modulo.
+/// C      -> Remainder or Truncated remainder.
+int python_modulo(int n, int M) { return ((n % M) + M) % M; }
+#define true_modulo python_modulo
+
 
 #define ANSI_RESET "\033[0m"
 #define ANSI_RED "\033[31m"
@@ -222,6 +227,7 @@ uint_type rand_uint(void) {
 //     bytes for the int.
 //     Because if we are already casting to double then why not just do
 //     something like (double)rand()/RAND_MAX ?
+// @Note: Inclusive.
 // Uniform int distribution.
 int rand_range(int min, int max) {
     // [0,1) -> [min,max]

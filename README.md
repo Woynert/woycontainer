@@ -1,7 +1,20 @@
-# Run coverage for fuzz test.
+## Run coverage for fuzz test.
 
+```
 make mesonSetupDebugClang
 make compile
 ./build/wmap_test_fuzzy -runs=1000
 make coverage
 make coverageClean # <- To start from fresh state.
+```
+
+## Tests
+
+|           | Manual test   | Auto test   | Fuzz test   | Tests include naive version |
+| --------- | ------------- | ----------- | ----------- | -------                     |
+| Array     |               |             |             |                             |
+| Vector    |               |             |             |                             |
+| Strpool   | X             | X           | X           | X                           |
+| Slot      | X             |             |             |                             |
+| Wmap      | X             | X           | X           | X                           |
+| Wstrmap   |               |             |             |                             |

@@ -88,9 +88,9 @@ int          strpool_append(Strpool *p, STRPOOL_STR view);
 STRPOOL_STR  strpool_get(const Strpool *p, int view_id);
 STRPOOL_STR  strpool_get_from_view(const Strpool *p, strpool__view view);
 int          strpool_remove(Strpool *p, int view_id);
-size_t       strpool_report_memory(const Strpool *p);
 void         strpool_clear(Strpool *p);
 int          strpool_get_next_id(Strpool *p);
+size_t       strpool_report_memory(const Strpool *p);
 
 int            strpool__grow(Strpool *p, int min_size);
 strpool__Node *strpool__get_node(const Strpool *p, int i);
@@ -261,8 +261,7 @@ int strpool__find_space(const Strpool *p, int space, int *out_i_prev_node) {
 }
 
 
-/// @returns index or -1.
-/// @reval   -1 Error.
+/// @Returns id, or -1 on error.
 int strpool_append(Strpool *p, STRPOOL_STR view) {
     int i_node_prev = -1;
     int i_node = -1;
