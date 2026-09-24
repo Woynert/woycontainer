@@ -150,7 +150,7 @@ int pfx(get_next_id)(const Slot *s) { return s->itemid_to_userid[s->count]; }
 
 // @Returns TYPE or NULL if not found.
 TYPE *pfx(get)(const Slot *s, int user_id) {
-    if (user_id < 0 || user_id > s->capacity) { return NULL; }
+    if (user_id < 0 || user_id >= s->capacity) { return NULL; }
     int item_id = s->userid_to_itemid[user_id];
     if (item_id >= s->count) { return NULL; }
     return &s->_items[item_id];
@@ -159,7 +159,7 @@ TYPE *pfx(get)(const Slot *s, int user_id) {
 
 /// @Returns error.
 int pfx(update)(const Slot *s, int user_id, TYPE item) {
-    if (user_id < 0 || user_id > s->capacity) { return -1; }
+    if (user_id < 0 || user_id >= s->capacity) { return -1; }
     int item_id = s->userid_to_itemid[user_id];
     if (item_id >= s->count) { return -1; }
     s->_items[item_id] = item;
@@ -169,7 +169,7 @@ int pfx(update)(const Slot *s, int user_id, TYPE item) {
 
 /// @Returns error.
 int pfx(pop)(Slot *s, int user_id) {
-    if (user_id < 0 || user_id > s->capacity) { return -1; }
+    if (user_id < 0 || user_id >= s->capacity) { return -1; }
     if (s->count <= 0) { return -1; }
     // Swap items.
     int item_id = s->userid_to_itemid[user_id];

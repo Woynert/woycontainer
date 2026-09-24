@@ -63,7 +63,10 @@ TEST test_general(void) {
     int view_id;
     Str result;
 
-    view_id = strpool_append(&pool, cstr_SL(""));
+    result = strpool_get(&pool, 0);
+    ASSERT(!strview_is_valid(result));
+
+    view_id = strpool_append(&pool, cstr_SL("MIMOS"));
     ASSERT_INT_GTE(view_id, 0);
     result = strpool_get(&pool, view_id);
     ASSERT(strview_is_valid(result));
