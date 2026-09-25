@@ -10,12 +10,14 @@ make coverageClean # <- To start from fresh state.
 
 ## Tests
 
-|           | Usable | Manual test   | Auto test   | Fuzz test   | Tests include naive version | Included tests anti internal memory leaks? |
-| --------- | ---    | ------------- | ----------- | ----------- | -------                     | ---                                        |
-| Array     | X      |               |             |             |                             |                                            |
-| Vector    | X      |               |             |             |                             |                                            |
-| StrVector |        |               |             |             |                             |                                            |
-| Strpool   | X      | X             | X           | X           | X                           |                                            |
-| Slot      | X      | X             |             |             |                             |                                            |
-| Wmap      | X      | X             | X           | X           | X                           |                                            |
-| Wstrmap   | X      | X             | X           | X           | X                           |                                            |
+| Container                 | File      | Usable | Manual test | Auto test     | Fuzz test   | Tests include naive version | Included tests anti internal memory leaks? |
+| ---------                 | ---       | ---    | ---         | ------------- | ----------- | -----------                 | -------                                    |
+| Array                     | array.h   | X      |             |               |             |                             |                                            |
+| Vector                    | da.h      | X      |             |               |             |                             |                                            |
+| StrVector                 | N/A       |        |             |               |             |                             |                                            |
+| Strpool                   | strpool.h | X      | X           | X             | X           | X                           |                                            |
+| Slot                      | slot.h    | X      | X           |               |             |                             |                                            |
+| Ordered hash map          | wmap.h    | X      | X           | X             | X           | X                           |                                            |
+| Ordered string hash map   | wmapstr.h | X      | X           | X             | X           | X                           |                                            |
+| Unordered hash map        | umap.h    | X      | X           |               |             |                             |                                            |
+| Unordered string hash map | umapstr.h | X      | X           |               |             |                             |                                            |
