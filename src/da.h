@@ -451,10 +451,11 @@ static DYNA__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
 
 #ifndef DYNA__MACROS
 #define DYNA__MACROS
-#define dyna_foreach_gnu(iter, array) \
-    struct { int index; typeof((array).items) ref; } iter = { .index = 0, .ref = (array).items }; iter.index < (array).size; ++iter.index, ++iter.ref
 #define dyna_foreach(type, iter, array) \
     struct { int index; type *ref; } iter = { .index = 0, .ref = (array).items }; iter.index < (array).size; ++iter.index, ++iter.ref
 #define dyna_foreach_reverse(type, iter, array) \
     struct { int index; type *ref; } iter = { .index = (array).size-1, .ref = &(array).items[(array).size-1] }; iter.index > -1; --iter.index, --iter.ref
+// https://stackoverflow.com/a/18067745
+#define dyna_foreach_gnu(iter, array) \
+    struct { int index; typeof((array).items+0) ref; } iter = { .index = 0, .ref = (array).items }; iter.index < (array).size; ++iter.index, ++iter.ref
 #endif

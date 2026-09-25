@@ -81,16 +81,23 @@ if not meson.is_subproject()
   wmap_test = executable('wmap_test', './src/wmap_test.c')
   test('wmap_test', wmap_test)
 
-  #wmapstr_test = executable('wmapstr_test', './src/wmapstr_test.c')
-  #test('wmapstr_test', wmapstr_test)
+  wmapstr_test = executable('wmapstr_test', './src/wmapstr_test.c')
+  test('wmapstr_test', wmapstr_test)
+
+  wmapstr_test2 = executable('wmapstr_test2', './src/wmapstr_test2.c')
+  test('wmapstr_test2', wmapstr_test2)
 
   # FUZZY TESTS
+
+  strpool_test_fuzzy = executable('strpool_test_fuzzy', './src/strpool_test.c',
+    c_args: ['-fsanitize=fuzzer', '-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION'],
+    link_args: '-fsanitize=fuzzer',)
 
   wmap_test_fuzzy = executable('wmap_test_fuzzy', './src/wmap_test.c',
     c_args: ['-fsanitize=fuzzer', '-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION'],
     link_args: '-fsanitize=fuzzer',)
 
-  strpool_test_fuzzy = executable('strpool_test_fuzzy', './src/strpool_test.c',
+  wmapstr_test_fuzzy = executable('wmapstr_test_fuzzy', './src/wmapstr_test2.c',
     c_args: ['-fsanitize=fuzzer', '-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION'],
     link_args: '-fsanitize=fuzzer',)
 

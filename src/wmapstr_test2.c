@@ -1,8 +1,10 @@
+#include "strpool.h"
 #include "stdio.h"
 #include "portable_utils.h"
 #include "woytest.h"
 #include "arena.h"
 #include "arenady.h"
+#include "wstrview.h"
 
 #define DYNA__TYPE int
 #define DYNA__NAMESPACE Vec_Int
@@ -10,6 +12,10 @@
 
 #define DYNA__TYPE Vec_Int
 #define DYNA__NAMESPACE Vec_Vec_Int
+#include "da.h"
+
+#define DYNA__TYPE strview_t
+#define DYNA__NAMESPACE Vec_Strview
 #include "da.h"
 
 #define MAKEVIEW__TYPE int
@@ -22,74 +28,98 @@
 
 #define View_Int_literal(...) (View_Int) {.data = (int[]){ __VA_ARGS__ }, .size=(int)(sizeof((int[]){ __VA_ARGS__ })/sizeof(int)) }
 
-#define WMAP__KEY int
-#define WMAP__TYPE int
-#define WMAP__NAMESPACE Map_Int
-#define WMAP__KEY_CAN_DO_BINARY_COMPARISON_AND_HASH
-#include "wmap.h"
+/*#define WMAP__KEY int*/
+#define WMAPSTR__TYPE int
+#define WMAPSTR__NAMESPACE MapStrInt
+#include "wmapstr.h"
 
 
 
 /// START [NAIVE MAP]
 typedef struct {
-    int key;
+    int key_id;
     int value;
 } NaivePair;
 #define DYNA__TYPE NaivePair
 #define DYNA__NAMESPACE Vec_NaivePair
 #include "da.h"
 typedef struct {
+    Strpool strpool;
     Vec_NaivePair pairs;
 } NaiveMap;
-NaiveMap naive_map_create(void) { return (NaiveMap) {.pairs=Vec_NaivePair_create()}; }
-void naive_map_free(NaiveMap *m) { Vec_NaivePair_free(&m->pairs); *m = (NaiveMap){0}; }
-int *naive_map_get(NaiveMap *m, int key) {
+NaiveMap naive_map_create(void) {
+    NaiveMap m = { 0 };
+    strpool_create(&m.strpool);
+    m.pairs = Vec_NaivePair_create();
+    return m;
+}
+void naive_map_free(NaiveMap *m) {
+    strpool_destroy(&m->strpool);
+    Vec_NaivePair_free(&m->pairs);
+    *m = (NaiveMap){0};
+}
+int *naive_map_get(const NaiveMap *m, strview_t key) {
     for (dyna_foreach_gnu(iter, m->pairs)) {
-        if (iter.ref->key == key) { return &iter.ref->value; }
+        strview_t key_str = strpool_get(&m->strpool, iter.ref->key_id);
+        if (wstrview_equals(key, key_str)) { return &iter.ref->value; }
     }
     return NULL;
 }
-int naive_map_upsert(NaiveMap *m, int key, int item) {
+int naive_map_upsert(NaiveMap *m, strview_t key, int item) {
     int *saved_item = naive_map_get(m, key);
     if (saved_item) { *saved_item = item; return 0; } // Update.
-    Vec_NaivePair_append(&m->pairs, (NaivePair){.key=key, .value=item});
+    int id = strpool_append(&m->strpool, key);
+    if (id == -1) { return -1; }
+    Vec_NaivePair_append(&m->pairs, (NaivePair){.key_id=id, .value=item});
     return 0;
 }
-void naive_map_remove(NaiveMap *m, int key) {
+void naive_map_remove(NaiveMap *m, strview_t key) {
     for (dyna_foreach_gnu(iter, m->pairs)) {
-        if (iter.ref->key == key) {
-            Vec_NaivePair_pop_at_preserve_order(&m->pairs, iter.index, NULL);
+        strview_t key_str = strpool_get(&m->strpool, iter.ref->key_id);
+        if (wstrview_equals(key, key_str)) {
+            int err = strpool_remove(&m->strpool, iter.ref->key_id);
+            wassert_live(!err);
+            err = Vec_NaivePair_pop_at_preserve_order(&m->pairs, iter.index, NULL);
+            wassert_live(!err);
             return;
         }
     }
 }
+strview_t naive_map_get_key(NaiveMap *m, int index) {
+    return strpool_get(&m->strpool, m->pairs.items[index].key_id);
+}
 /// END [NAIVE MAP]
 /// START [BOTH MAPS]
-int both_maps_upsert(Map_Int *a, NaiveMap *b, int key, int item) {
-    return Map_Int_upsert(a, key, item) + naive_map_upsert(b, key, item);
+int both_maps_upsert(MapStrInt *a, NaiveMap *b, strview_t key, int item) {
+    return MapStrInt_upsert(a, key, item) + naive_map_upsert(b, key, item);
 }
-void both_maps_remove(Map_Int *a, NaiveMap *b, int key) {
-    Map_Int_remove(a, key); naive_map_remove(b, key);
+void both_maps_remove(MapStrInt *a, NaiveMap *b, strview_t key) {
+    MapStrInt_remove(a, key); naive_map_remove(b, key);
 }
-int *both_maps_get(Map_Int *a, NaiveMap *b, int key, bool *out_equal) {
-    int *result_a = Map_Int_get(a, key);
+int *both_maps_get(MapStrInt *a, NaiveMap *b, strview_t key, bool *out_equal) {
+    int *result_a = MapStrInt_get(a, key);
     int *result_b = naive_map_get(b, key);
     *out_equal = (result_a == NULL && result_a == result_b) || (*result_a == *result_b);
     return result_a;
 }
-bool both_maps_compare_order_and_contents(Map_Int *a, NaiveMap *b) {
-    if (Map_Int_pair_count(a) != b->pairs.size
-        || Map_Int_pair_count(a) != a->values.count
+bool both_maps_compare_order_and_contents(MapStrInt *a, NaiveMap *b) {
+    if (MapStrInt_pair_count(a) != b->pairs.size
+        || MapStrInt_pair_count(a) != a->values.count
     ) { printferr("Wrong pair count."); return false; }
     // Forward.
     {
         int k = 0;
-        Map_Int_It it = Map_Int_make_it(a);
-        while (Map_Int_it_next(a, &it)) {
+        MapStrInt_It it = MapStrInt_make_it(a);
+        while (MapStrInt_it_next(a, &it)) {
             if (!int_in_range_inclusive(0, b->pairs.size-1, k)) { printferr("Worng pair count.."); return false; }
-            if (it.key != b->pairs.items[k].key
+            strview_t naive_saved_key = strpool_get(&b->strpool, b->pairs.items[k].key_id);
+            /*printfd("%d/%d", k, b->pairs.size-1);*/
+            /*printfd(ANSI_BLU"["PRIstrw"](%d) ==? ["PRIstrw"](%d)", PRIstrarg(it.key), it.key.size, PRIstrarg(naive_saved_key), naive_saved_key.size);*/
+            if (!wstrview_equals(it.key, naive_saved_key)
                 || *it.value != b->pairs.items[k].value)
             {
+                /*printfd("["PRIstrw"](%d) ==? ["PRIstrw"](%d)", PRIstrarg(it.key), it.key.size, PRIstrarg(naive_saved_key), naive_saved_key.size);*/
+                /*printfd("%d ==? %d", *it.value, b->pairs.items[k].value);*/
                 printferr("Wrong key or value."); 
                 return false;
             }
@@ -100,10 +130,13 @@ bool both_maps_compare_order_and_contents(Map_Int *a, NaiveMap *b) {
     // Backwards.
     {
         int k = b->pairs.size-1;
-        Map_Int_It it = Map_Int_make_it_end(a);
-        while (Map_Int_it_prev(a, &it)) {
+        MapStrInt_It it = MapStrInt_make_it_end(a);
+        while (MapStrInt_it_prev(a, &it)) {
             if (!int_in_range_inclusive(0, b->pairs.size-1, k)) { printferr("Worng pair count.."); return false; }
-            if (it.key != b->pairs.items[k].key
+            /*if (it.key != b->pairs.items[k].key*/
+                /*|| *it.value != b->pairs.items[k].value)*/
+            strview_t naive_saved_key = strpool_get(&b->strpool, b->pairs.items[k].key_id);
+            if (!wstrview_equals(it.key, naive_saved_key)
                 || *it.value != b->pairs.items[k].value)
             {
                 printferr("Wrong key or value."); 
@@ -124,8 +157,8 @@ typedef struct {
     View_Vec_Int bucket_chains;
 } IntegrityTest;
 
-IntegrityTest get_integrity_snapshot(Map_Int *w, Arena *perm) {
-    Map_Int__Table *m = &w->table;
+IntegrityTest get_integrity_snapshot(MapStrInt *w, Arena *perm) {
+    MapStrInt__Table *m = &w->table;
     IntegrityTest integrity = { 0 };
     {
         Vec_Int order_keys = Vec_Int_create_with_allocator(arena_allocator, perm);
@@ -148,7 +181,7 @@ IntegrityTest get_integrity_snapshot(Map_Int *w, Arena *perm) {
                 wassert(bucket_keys);
             };
             ID node = ID_make(i);
-            if (Map_Int__Table_slot_is_empty(m, node)) { continue; }
+            if (MapStrInt__Table_slot_is_empty(m, node)) { continue; }
             while (ID_valid(node)) {
                 Vec_Int_append(bucket_keys, m->keys.items[ID_get(node)]);
                 node = m->bucket_next.items[ID_get(node)];
@@ -159,8 +192,8 @@ IntegrityTest get_integrity_snapshot(Map_Int *w, Arena *perm) {
     return integrity;
 }
 
-bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
-    Map_Int__Table *m = &w->table;
+bool check_integrity(MapStrInt *w, IntegrityTest integrity, Arena scratch) {
+    MapStrInt__Table *m = &w->table;
     // Check buckets.
     {
         if (integrity.bucket_chains.size != m->bucket_count) {
@@ -179,7 +212,7 @@ bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
 
             ID node = ID_make(i);
             ID last_valid_node = node;
-            if (Map_Int__Table_slot_is_empty(m, node)) {
+            if (MapStrInt__Table_slot_is_empty(m, node)) {
                 if (keys.size == 0) { continue; }
                 else {
                     printferr("Coudln't find any, expected %d (bucket %d).", keys.size, i);
@@ -271,14 +304,14 @@ bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
 /*
    Swaps all nodes of the same bucket and test whether they're still all present.
    */
-void shuffle_collision_nodes_same_bucket(Map_Int *w, const int iterations, Arena arena) {
-    Map_Int__Table *m = &w->table;
+void shuffle_collision_nodes_same_bucket(MapStrInt *w, const int iterations, Arena arena) {
+    MapStrInt__Table *m = &w->table;
     for (int i = 0; i < m->bucket_count; ++i) {
         Arena scratch = arena;
         Vec_Int bucket_nodes = Vec_Int_create_with_allocator(arena_allocator, &scratch);
 
         const ID bucket = ID_make(i);
-        if (Map_Int__Table_slot_is_empty(m, bucket)) { continue; }
+        if (MapStrInt__Table_slot_is_empty(m, bucket)) { continue; }
         ID node = bucket;
         while (ID_valid(node)) {
             Vec_Int_append(&bucket_nodes, ID_get(node));
@@ -289,15 +322,15 @@ void shuffle_collision_nodes_same_bucket(Map_Int *w, const int iterations, Arena
         for (int k = 0; k < iterations; ++k) {
             int a = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
             int b = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
-            Map_Int__Table__swap_nodes_same_bucket(m, ID_make(a), ID_make(b));
+            MapStrInt__Table__swap_nodes_same_bucket(m, ID_make(a), ID_make(b));
         }
     }
 }
 
 
 // START [PRINTING]
-void map_print(Map_Int *w) {
-    Map_Int__Table *m = &w->table;
+void map_print(MapStrInt *w) {
+    MapStrInt__Table *m = &w->table;
     printf("Printing map, size %d, buckets %d, pairs %d, cols %d, first %d, last %d",
             m->capacity, m->bucket_count,
             m->pair_count, m->collision_count, ID_get(m->first_node), ID_get(m->last_node));
@@ -342,8 +375,8 @@ void map_print(Map_Int *w) {
     //}
     printf("\n");
 }
-void map_print_order(Map_Int *w, bool backwards) {
-    Map_Int__Table *m = &w->table;
+void map_print_order(MapStrInt *w, bool backwards) {
+    MapStrInt__Table *m = &w->table;
     const int MAX_CYCLES = 100;
     int cycles = 0;
     ID node = m->first_node;
@@ -365,8 +398,8 @@ void map_print_order(Map_Int *w, bool backwards) {
     }
     printf("\n");
 }
-void map_print_bucket_chains(Map_Int *w) {
-    Map_Int__Table *m = &w->table;
+void map_print_bucket_chains(MapStrInt *w) {
+    MapStrInt__Table *m = &w->table;
     const int max_cycles = 100;
     int cycles = 0;
     printf("Forward:\n");
@@ -391,40 +424,40 @@ TEST test_manual(void) {
     ArenaRoot arenaroot = ArenaRoot_create(1 << 20);
     Arena arena = ArenaRoot_get_arena(arenaroot);
     int err;
-    Map_Int _map = { 0 };
-    Map_Int *m = &_map;
-    Map_Int_create(m);
+    MapStrInt _map = { 0 };
+    MapStrInt *m = &_map;
+    MapStrInt_create(m);
 
     map_print(m);
     printfd("---");
-    err = Map_Int_upsert(m, 888, 80);
+    err = MapStrInt_upsert(m, cstr_SL("888"), 80);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(Map_Int_pair_count(m), 1);
+    ASSERT_INT(MapStrInt_pair_count(m), 1);
     printfd("---");
-    err = Map_Int_upsert(m, 1, 10);
+    err = MapStrInt_upsert(m, cstr_SL("1"), 10);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(Map_Int_pair_count(m), 2);
+    ASSERT_INT(MapStrInt_pair_count(m), 2);
     printfd("---");
-    err = Map_Int_upsert(m, 2, 20);
+    err = MapStrInt_upsert(m, cstr_SL("2"), 20);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(Map_Int_pair_count(m), 3);
+    ASSERT_INT(MapStrInt_pair_count(m), 3);
     printfd("---");
-    err = Map_Int_upsert(m, 3, 30);
+    err = MapStrInt_upsert(m, cstr_SL("3"), 30);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(Map_Int_pair_count(m), 4);
+    ASSERT_INT(MapStrInt_pair_count(m), 4);
     printfd("---");
-    err = Map_Int_upsert(m, 4, 40);
+    err = MapStrInt_upsert(m, cstr_SL("4"), 40);
     map_print(m);
     ASSERT_INT(err, 0);
-    ASSERT_INT(Map_Int_pair_count(m), 5);
+    ASSERT_INT(MapStrInt_pair_count(m), 5);
     printfd("---");
-    err = Map_Int_upsert(m, 5, 50);
+    err = MapStrInt_upsert(m, cstr_SL("5"), 50);
     ASSERT_INT(err, 0);
-    ASSERT_INT(Map_Int_pair_count(m), 6);
+    ASSERT_INT(MapStrInt_pair_count(m), 6);
 
     map_print(m);
     map_print_bucket_chains(m);
@@ -439,7 +472,7 @@ TEST test_manual(void) {
         for (int i = 0; i < 100; ++i) {
             int a = rand_range(m->table.bucket_count, (m->table.bucket_count) + m->table.collision_count-1);
             int b = rand_range(m->table.bucket_count, (m->table.bucket_count) + m->table.collision_count-1);
-            Map_Int__Table__swap_nodes_diff_bucket(&m->table, ID_make(a), ID_make(b));
+            MapStrInt__Table__swap_nodes_diff_bucket(&m->table, ID_make(a), ID_make(b));
         }
         printfd("---");
         map_print(m);
@@ -465,41 +498,51 @@ TEST test_manual(void) {
     map_print_bucket_chains(m);
     map_print_order(m, false);
 
-    int key;
-    key = 888;
-    printfd("Removing %d", key);
-    Map_Int_remove(m, key);
+    strview_t key;
+    key = cstr_SL("888");
+    printfd("Removing ["PRIstrw"]", PRIstrarg(key));
+    MapStrInt_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
-    key = 3;
-    printfd("Removing %d", key);
-    Map_Int_remove(m, key);
+    key = cstr_SL("3");
+    printfd("Removing ["PRIstrw"]", PRIstrarg(key));
+    MapStrInt_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
-    key = 4;
-    printfd("Removing %d", key);
-    Map_Int_remove(m, key);
+    key = cstr_SL("4");
+    printfd("Removing ["PRIstrw"]", PRIstrarg(key));
+    MapStrInt_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
-    key = 5;
-    printfd("Removing %d", key);
-    Map_Int_remove(m, key);
+    key = cstr_SL("5");
+    printfd("Removing ["PRIstrw"]", PRIstrarg(key));
+    MapStrInt_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
-    key = 1;
-    printfd("Removing %d", key);
-    Map_Int_remove(m, key);
+    key = cstr_SL("1");
+    printfd("Removing ["PRIstrw"]", PRIstrarg(key));
+    MapStrInt_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
 
-    Map_Int_free(m);
+    MapStrInt_free(m);
     ArenaRoot_free(&arenaroot);
     TEST_PASS;
+}
+
+
+strview_t create_random_string(int size, Arena *perm) {
+    char *data = arena_new(perm, char, size);
+    wassert_live(data);
+    for (int i = 0; i < size; ++i) {
+        data[i] = (char)rand_range(32, 126);
+    }
+    return (strview_t) { .data = data, .size = size, };
 }
 
 
@@ -508,9 +551,9 @@ TEST test_auto(void) {
     Arena arena = ArenaRoot_get_arena(arenaroot);
     int err;
 
-    Map_Int _map = { 0 };
-    Map_Int *m = &_map;
-    Map_Int_create(m);
+    MapStrInt _map = { 0 };
+    MapStrInt *m = &_map;
+    MapStrInt_create(m);
     NaiveMap _naive = naive_map_create();
     NaiveMap *nai = &_naive;
 
@@ -519,8 +562,10 @@ TEST test_auto(void) {
     // Insert NEW pairs.
     {
         for (int i = 0; i < 100; ++i) {
-            int key = rand_range(INT_MIN, INT_MAX);
-            int value = key / 10;
+            // @Note: Probably better to get the key from the random number.
+            Arena scratch = arena;
+            strview_t key = create_random_string(i * 4, &scratch); 
+            int value = rand_range(INT_MIN, INT_MAX);
             err = both_maps_upsert(m, nai, key, value);
             ASSERT(!err);
         }
@@ -533,8 +578,9 @@ TEST test_auto(void) {
         IntegrityTest integrity = get_integrity_snapshot(m, &scratch);
         for (int i = 0; i < nai->pairs.size/2; ++i) {
             int id = rand_range(0, nai->pairs.size-1);
-            int key = nai->pairs.items[id].key;
-            int value = key / 100;
+            /*strview_t key = strpool_get(&nai->strpool, nai->pairs.items[id].key_id);*/
+            strview_t key = naive_map_get_key(nai, id);
+            int value = rand_range(INT_MIN, INT_MAX);
             both_maps_upsert(m, nai, key, value);
         }
         ASSERT(both_maps_compare_order_and_contents(m, nai));
@@ -545,7 +591,9 @@ TEST test_auto(void) {
     {
         for (int i = 0; i < nai->pairs.size/2; ++i) {
             int id = rand_range(0, nai->pairs.size-1);
-            int key = nai->pairs.items[id].key;
+            /*int key = nai->pairs.items[id].key;*/
+            /*strview_t key = strpool_get(&nai->strpool, nai->pairs.items[id].key_id);*/
+            strview_t key = naive_map_get_key(nai, id);
             both_maps_remove(m, nai, key);
         }
         ASSERT(both_maps_compare_order_and_contents(m, nai));
@@ -554,8 +602,11 @@ TEST test_auto(void) {
     // Insert pairs again.
     {
         for (int i = 0; i < 200; ++i) {
-            int key = rand_range(INT_MIN, INT_MAX);
-            int value = key / 10;
+            /*int key = rand_range(INT_MIN, INT_MAX);*/
+            /*int value = key / 10;*/
+            Arena scratch = arena;
+            strview_t key = create_random_string(i * 4, &scratch); 
+            int value = rand_range(INT_MIN, INT_MAX);
             err = both_maps_upsert(m, nai, key, value);
             ASSERT(!err);
         }
@@ -574,12 +625,12 @@ TEST test_auto(void) {
 
     // DELME
     {
-        int i = 0; Map_Int_It it = Map_Int_make_it(m);
-        while(Map_Int_it_next(m, &it)) {
-            int key = nai->pairs.items[i].key;
-            printfd("%d. [%d]=>%d", i, key, nai->pairs.items[i].value);
-            printfd("%d. [%d]=>%d", i, key, *Map_Int_get(m, key));
-            ASSERT_INT(nai->pairs.items[i].value, *Map_Int_get(m, key));
+        int i = 0; MapStrInt_It it = MapStrInt_make_it(m);
+        while(MapStrInt_it_next(m, &it)) {
+            strview_t key = naive_map_get_key(nai, i);
+            printfd("%d. ["PRIstrw"]=>%d", i, PRIstrarg(key), nai->pairs.items[i].value);
+            printfd("%d. ["PRIstrw"]=>%d", i, PRIstrarg(key), *MapStrInt_get(m, key));
+            ASSERT_INT(nai->pairs.items[i].value, *MapStrInt_get(m, key));
             ++i;
         }
     }
@@ -587,33 +638,46 @@ TEST test_auto(void) {
     // Remove all pairs.
     {
         Arena scratch = arena;
+        Strpool saved_keys; strpool_create_with_allocator(&saved_keys, arena_allocator, &scratch);
         Vec_Int keys = Vec_Int_create_with_allocator(arena_allocator, &scratch);
-        Map_Int_It it = Map_Int_make_it(m);
-        while(Map_Int_it_next(m, &it)) {
-            Vec_Int_append(&keys, it.key);
+        MapStrInt_It it = MapStrInt_make_it(m);
+        while(MapStrInt_it_next(m, &it)) {
+            int key_id = strpool_append(&saved_keys, it.key);
+            ASSERT(key_id != -1);
+            Vec_Int_append(&keys, key_id);
         }
         for (dyna_foreach_gnu(iter, keys)) {
-            both_maps_remove(m, nai, *iter.ref);
+            strview_t key = strpool_get(&saved_keys, *iter.ref);
+            both_maps_remove(m, nai, key);
         }
         ASSERT(both_maps_compare_order_and_contents(m, nai));
+        ASSERT_INT(m->values.count, 0);
     }
 
     map_print(m); map_print_bucket_chains(m); map_print_order(m, false);
 
-    Map_Int_free(m);
+    MapStrInt_free(m);
     naive_map_free(nai);
     ArenaRoot_free(&arenaroot);
     TEST_PASS;
 }
 
 
-static Map_Int map_for_fuzzer;
+static MapStrInt map_for_fuzzer;
 static NaiveMap nm_for_fuzzer;
 void LLVMFuzzerCleanup(void) {
-    Map_Int_free(&map_for_fuzzer); naive_map_free(&nm_for_fuzzer);
+    MapStrInt_free(&map_for_fuzzer); naive_map_free(&nm_for_fuzzer);
 }
 int LLVMFuzzerInitialize(int *argc, char ***argv) {
     (void)argc,(void)argv; atexit(LLVMFuzzerCleanup); return 0;
+}
+strview_t get_str_from_remainder(ArenaDy *perm) {
+    int size = (int)(perm->end - perm->beg);
+    if (size <= 0) { return STRVIEW_INVALID; }
+    const char *data = (char *)arenady_try_get(perm, sizeof(char), _Alignof(char), size);
+    if (!data) { return STRVIEW_INVALID; }
+    return (strview_t) { data, size };
+
 }
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /*
@@ -621,11 +685,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         after each operation it's verified they contain same order and contents.
        */
     static bool setup = false;
-    static Map_Int *m = &map_for_fuzzer;
+    static MapStrInt *m = &map_for_fuzzer;
     static NaiveMap *nm = &nm_for_fuzzer;
     if (!setup) {
         setup = true;
-        Map_Int_create(m);
+        MapStrInt_create(m);
         nm_for_fuzzer = naive_map_create();
     }
 
@@ -636,42 +700,53 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     switch (*action) {
         case 0:
         {
-            const int *key = arenady_try_get_one(&arena, int);
+            /*printfd(ANSI_RED"DELME INSERT");*/
             const int *value = arenady_try_get_one(&arena, int);
-            if (!key || !value) { break; }
-            int err = both_maps_upsert(m, nm, *key, *value);
+            if (!value) { break; }
+            strview_t key = get_str_from_remainder(&arena);
+            if (!wstrview_is_valid(key)) { return 0; }
+            int err = both_maps_upsert(m, nm, key, *value);
             wassert_live(err == 0);
             wassert_live(both_maps_compare_order_and_contents(m, nm));
             break;
         }
         case 1:
         {
-            const int *key = arenady_try_get_one(&arena, int);
-            if (!key) { break; }
-            both_maps_remove(m, nm, *key);
+            /*printfd(ANSI_RED"DELME REMOVE");*/
+            strview_t key = get_str_from_remainder(&arena);
+            if (!wstrview_is_valid(key)) { return 0; }
+            int prev_count_a = m->values.count;
+            int prev_count_b = nm->pairs.size;
+            both_maps_remove(m, nm, key);
+            int new_count_a = m->values.count;
+            int new_count_b = nm->pairs.size;
+            wassert_live(prev_count_a == prev_count_b);
+            wassert_live(new_count_a == new_count_b);
+            /*printfd("%d, %d", prev_count_a, new_count_a);*/
             wassert_live(both_maps_compare_order_and_contents(m, nm));
             break;
         }
         case 2:
         {
-            const int *key = arenady_try_get_one(&arena, int);
-            if (!key) { break; }
+            /*printfd(ANSI_RED"DELME GET");*/
+            strview_t key = get_str_from_remainder(&arena);
+            if (!wstrview_is_valid(key)) { return 0; }
             bool equal = false;
-            both_maps_get(m, nm, *key, &equal);
+            both_maps_get(m, nm, key, &equal);
             wassert_live(equal);
             wassert_live(both_maps_compare_order_and_contents(m, nm));
             break;
         }
         case 3:
         {
-            Map_Int_It it = Map_Int_make_it(m);
-            while(Map_Int_it_next(m, &it)) { (void)0; }
+            MapStrInt_It it = MapStrInt_make_it(m);
+            while(MapStrInt_it_next(m, &it)) { (void)0; }
             break;
         }
         case 4:
         {
-            Map_Int_It it = Map_Int_make_it_end(m);
-            while(Map_Int_it_prev(m, &it)) { (void)0; }
+            MapStrInt_It it = MapStrInt_make_it_end(m);
+            while(MapStrInt_it_prev(m, &it)) { (void)0; }
             break;
         }
         default: break;

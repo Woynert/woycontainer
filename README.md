@@ -10,11 +10,12 @@ make coverageClean # <- To start from fresh state.
 
 ## Tests
 
-|           | Manual test   | Auto test   | Fuzz test   | Tests include naive version |
-| --------- | ------------- | ----------- | ----------- | -------                     |
-| Array     |               |             |             |                             |
-| Vector    |               |             |             |                             |
-| Strpool   | X             | X           | X           | X                           |
-| Slot      | X             |             |             |                             |
-| Wmap      | X             | X           | X           | X                           |
-| Wstrmap   |               |             |             |                             |
+|           | Usable | Manual test   | Auto test   | Fuzz test   | Tests include naive version | Included tests anti internal memory leaks? |
+| --------- | ---    | ------------- | ----------- | ----------- | -------                     | ---                                        |
+| Array     | X      |               |             |             |                             |                                            |
+| Vector    | X      |               |             |             |                             |                                            |
+| StrVector |        |               |             |             |                             |                                            |
+| Strpool   | X      | X             | X           | X           | X                           |                                            |
+| Slot      | X      | X             |             |             |                             |                                            |
+| Wmap      | X      | X             | X           | X           | X                           |                                            |
+| Wstrmap   | X      | X             | X           | X           | X                           |                                            |

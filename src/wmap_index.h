@@ -1,11 +1,10 @@
 /*
-    Ordered hash map index WIP...
+    Core low level indexing table to create hash maps. See wmap.h and wmapstr.h.
 
     Features:
 
     * All operations are constant time O(1), for example: upsert, get, remove.
         * Degrades to linked list search on collisions.
-    * Orderly forward and reverse iteration.
     * Good memory locality.
        * Uses struct of arrays (ECS like).
        * Operations only read what they need. (Most of the time).
@@ -23,37 +22,29 @@
 #define WMAPINDEX__TOKCAT_(a, b) a ## b
 #define WMAPINDEX__TOKCAT(a, b) WMAPINDEX__TOKCAT_(a, b)
 #ifndef WMAPINDEX__NAMESPACE
-#define WMAPINDEX__NAMESPACE WMAPINDEX__TOKCAT(UMapindex_, WMAPINDEX__TYPE)
+#define WMAPINDEX__NAMESPACE UMapindex_
 #endif
 #define WMAPINDEX__PFX(name) WMAPINDEX__TOKCAT(WMAPINDEX__TOKCAT(WMAPINDEX__NAMESPACE, _), name)
 #define WMAPINDEX__PRI(name) WMAPINDEX__TOKCAT(WMAPINDEX__TOKCAT(WMAPINDEX__NAMESPACE, __), name)
-#if (defined pub | defined pri | defined TYPE | defined WMapIndex)
-#error "These macros should not be defined: pub, pri, TYPE, WMapIndex"
+#if (defined pub | defined pri | defined WMapIndex)
+#error "These macros should not be defined: pub, pri, WMapIndex"
 #endif
 
-#if !defined WMAPINDEX__KEY || !defined WMAPINDEX__TYPE
+#if !defined WMAPINDEX__KEY
     #define WMAPINDEX__KEY double
-    #define WMAPINDEX__TYPE float
 #endif
 
 
 #define ARRAY__TYPE WMAPINDEX__KEY
 #define ARRAY__NAMESPACE WMAPINDEX__PRI(Arr_Key)
 #include "array.h"
-#define ARRAY__TYPE WMAPINDEX__TYPE
-#define ARRAY__NAMESPACE WMAPINDEX__PRI(Arr_Value)
-#include "array.h"
 #define ARRAY__TYPE ID
 #define ARRAY__NAMESPACE WMAPINDEX__PRI(Arr_Int)
 #include "array.h"
-#define SLOT__TYPE WMAPINDEX__TYPE
-#define SLOT__NAMESPACE WMAPINDEX__PRI(Slot_Value)
-#include "slot.h"
 
 #define pub WMAPINDEX__PFX
 #define pri WMAPINDEX__PRI
 #define KEY WMAPINDEX__KEY
-#define TYPE WMAPINDEX__TYPE
 #define WMapIndex WMAPINDEX__NAMESPACE
 #define WMAPINDEX__ALLOC_PROTOTYPE(x) void* (x) (void* ptr, size_t size, int align, void* user_data)
 #define WMAPINDEX__DEFAULT_SIZE_EXP 8
@@ -78,14 +69,6 @@ typedef struct {
     ID last_node;          // For reverse iteration.
 } WMapIndex;
 
-typedef struct {
-    TYPE *value;
-    KEY key;
-    ID __id;
-    ID __value_id;
-} pub(It);
-
-
 
 int     pub(create)(WMapIndex *m);
 int     pub(create_with_allocator)(WMapIndex *m, WMAPINDEX__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
@@ -98,7 +81,7 @@ static inline bool pub(slot_is_empty(const WMapIndex *m, ID i)) { return !ID_val
 void    pri(clear)(WMapIndex *m, int from, int to);
 void    pri(swap_nodes_same_bucket)(WMapIndex *m, const ID a, const ID b);
 void    pri(swap_nodes_diff_bucket)(WMapIndex *m, ID a, ID b);
-static inline ID  pub(if_invalid_get_next_valid_id)(WMapIndex *m, ID i);
+static inline ID  pub(if_invalid_get_next_valid_id)(const WMapIndex *m, ID i);
 
 
 /// @Note. Doesn't allocate on creation. Aka default capacity is 0.
@@ -150,7 +133,7 @@ int pub(grow)(WMapIndex *m, int new_cap) {
 }
 
 
-static inline ID pub(if_invalid_get_next_valid_id)(WMapIndex *m, ID i) {
+static inline ID pub(if_invalid_get_next_valid_id)(const WMapIndex *m, ID i) {
     return ((!ID_valid(i)) || (ID_valid(i) && !pub(slot_is_empty)(m, i))) ?
         ID_make(m->bucket_count + m->collision_count) :
         i;
@@ -322,14 +305,13 @@ void pub(remove)(WMapIndex *m, ID i) {
 
 
 
-
 #undef pub
 #undef pri
 #undef KEY
-#undef TYPE
 #undef WMapIndex
 #undef WMAPINDEX__ALLOC_PROTOTYPE
 #undef WMAPINDEX__DEFAULT_SIZE_EXP
 #undef WMAPINDEX__REHASH_FACTOR
 #undef WMAPINDEX__MAX_COUNT
-
+#undef WMAPINDEX__KEY
+#undef WMAPINDEX__NAMESPACE

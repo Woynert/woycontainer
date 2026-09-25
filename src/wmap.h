@@ -129,7 +129,7 @@ pub(It) pub(make_it_end)(const WMap *m) { return (pub(It)) { .__id = m->table.la
 int     pub(pair_count)(const WMap *m) { return m->table.pair_count; }
 
 int  pri(rehash_if_needed)(WMap *old_m);
-int  pri(find)(WMap *m, KEY key, ID *out_prev_id, ID *out_id);
+int  pri(find)(const WMap *m, KEY key, ID *out_prev_id, ID *out_id);
 bool pri(default_equal)(KEY a, KEY b, void *data) { (void)data; return 0 == memcmp(&a, &b, sizeof(a)); }
 uint64_t pri(default_hash)(KEY k, void *data) { (void)data; return wmap__hash((char*)&k, sizeof(k)); }
 
@@ -152,10 +152,6 @@ void pub(free)(WMap *m) {
 }
 
 
-static inline ID pri(table_get_bucket)(pri(Table) *t, uint64_t hash) {
-    return t->bucket_count == 0 ? ID_INVALID : ID_make((int)(hash & (uint64_t)(t->bucket_count - 1)));
-    // bucket_count must be power of 2.
-}
 
 
 int pri(rehash_if_needed)(WMap *old_m) {
@@ -204,10 +200,16 @@ int pri(rehash_if_needed)(WMap *old_m) {
 }
 
 
+static inline ID pri(table_get_bucket)(const pri(Table) *t, uint64_t hash) {
+    return t->bucket_count == 0 ? ID_INVALID : ID_make((int)(hash & (uint64_t)(t->bucket_count - 1)));
+    // bucket_count must be power of 2.
+}
+
+
 /// @Param[out] out_id. If found, corresponding id, else id where you should insert it.
 /// @Param[out] out_prev_id. Optional.
 /// @Returns 0 if found. -1 if not.
-int pri(find)(WMap *m, KEY key, ID *out_id, ID *out_prev_id) {
+int pri(find)(const WMap *m, KEY key, ID *out_id, ID *out_prev_id) {
     ID prev_id = ID_INVALID;
     ID id = pri(table_get_bucket)(&m->table, WMAP__KEY_HASH(key, m->userdata));
     do {
@@ -277,7 +279,7 @@ bool pub(it_next)(const WMap *m, pub(It) *it) {
         it->key        = t->keys.items[ID_get(it->__id)];
         it->value      = pri(Slot_Value_get)(&m->values, ID_get(t->val_ids.items[ID_get(it->__id)]));
         it->__value_id = t->val_ids.items[ID_get(it->__id)];
-        it->__id       = t->next.items[ID_get(it->__id)];
+        it->__id       = t->next.items[ID_get(it->__id)]; // <-- At last, advance id.
         return true;
     }
     return false;
@@ -290,7 +292,7 @@ bool pub(it_prev)(const WMap *m, pub(It) *it) {
         it->key        = t->keys.items[ID_get(it->__id)];
         it->value      = pri(Slot_Value_get)(&m->values, ID_get(t->val_ids.items[ID_get(it->__id)]));
         it->__value_id = t->val_ids.items[ID_get(it->__id)];
-        it->__id       = t->prev.items[ID_get(it->__id)];
+        it->__id       = t->prev.items[ID_get(it->__id)]; // <-- At last, advance id.
         return true;
     }
     return false;
