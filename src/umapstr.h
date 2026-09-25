@@ -1,5 +1,5 @@
 /*
-   Unordered map with strings as keys.
+   Unordered hash map with strings as keys.
    */
 
 #ifndef UMAPSTR__TYPE

@@ -305,6 +305,31 @@ static STRMAP__TYPE *pub(get)(Strmap *m, strview_t key) {
 }
 
 
+/*
+/// @Note. Like 'get' but gives you an iterator.
+/// @Note. If key not found it will point to the first element.
+/// @Note. If you want to iterate all pairs just do `my_map_It it = { 0 };`.
+static pub(It) pub(get_it)(Strmap *m, strview_t key) {
+    pub(It) it = { 0 };
+    int bucket_id = pri(hash_and_get_bucket_id)(m, key);
+    pri(Bucket) *bucket = &m->buckets.items[bucket_id];
+    for (int i = 0; i < bucket->pairs.size; ++i) {
+        int str_internal_storage_key = bucket->pairs.items[i].key;
+        strview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
+        if (wstrview_equals(stored_key, key))
+        {
+            return (pub(It)) {
+                .__pair_id = i,
+                .__bucket_id = bucket_id,
+                .key = stored_key,
+                .value = &bucket->pairs.items[i].value,
+            };
+        }
+    }
+    return it;
+}*/
+
+
 /// @Returns Error.
 static int pub(remove)(Strmap *m, strview_t key) {
     pri(Bucket) *bucket = pri(hash_and_get_bucket)(m, key);
@@ -354,6 +379,21 @@ bool pub(it_next)(const Strmap *m, pub(It) *it) {
     }
     return false;
 }
+
+
+/// @Note. Modifying the map while iterating is UB.
+//bool pub(it_prev)(const Strmap *m, pub(It) *it) {
+    //for (; it->__bucket_id >= 0; --it->__bucket_id, it->__pair_id = m->buckets.items[it->__bucket_id].pairs.size -1) {
+        //while (it->__pair_id >= 0) {
+            //int key_str_id = m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].key;
+            //it->value = &m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].value;
+            //it->key = strpool_get(&m->strpool, key_str_id);
+            //--it->__pair_id;
+            //return true;
+        //}
+    //}
+    //return false;
+//}
 
 
 size_t pub(report_memory)(Strmap *m) {
