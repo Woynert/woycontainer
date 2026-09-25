@@ -4,7 +4,7 @@
 #include "arena.h"
 #include "arenady.h"
 
-typedef struct { int first; int second; } Pair;
+typedef struct { ID first; ID second; } Pair;
 #define DYNA__TYPE Pair
 #define DYNA__NAMESPACE VecPair
 #include "da.h"
@@ -41,38 +41,38 @@ void naivestrpool_free(NaiveStrpool *n) {
     *n = (NaiveStrpool) { 0 };
 }
 // @Returns item id, or -1 on error.
-int naivestrpool_append(NaiveStrpool *n, strview_t view) {
+ID naivestrpool_append(NaiveStrpool *n, strview_t view) {
     char *copy = (char*)malloc((size_t)view.size);
     memcpy(copy, view.data, (size_t)(view.size));
     strview_t view_copy = { .data = copy, .size = view.size, };
     int id = SlotStrview_append(&n->strings, view_copy);
     if (id == -1) { free(copy); }
-    return id;
+    return ID_make(id);
 }
-strview_t naivestrpool_get(NaiveStrpool *n, int id) {
-    strview_t *view = SlotStrview_get(&n->strings, id);
+strview_t naivestrpool_get(NaiveStrpool *n, ID id) {
+    strview_t *view = SlotStrview_get(&n->strings, IDget(id));
     return view ? *view : STRVIEW_INVALID;
 }
-int naivestrpool_remove(NaiveStrpool *n, int id) {
-    strview_t *view = SlotStrview_get(&n->strings, id);
+int naivestrpool_remove(NaiveStrpool *n, ID id) {
+    strview_t *view = SlotStrview_get(&n->strings, IDget(id));
     if (view) { free((void*)view->data); }
-    return SlotStrview_pop(&n->strings, id);
+    return SlotStrview_pop(&n->strings, IDget(id));
 }
 /// ***** END OF [NAIVE STRING POOL]
 /// ***** START OF [BOTH POOLS]
-bool both_pools_append(Strpool *p, NaiveStrpool *n, strview_t view, int *out_id1, int *out_id2) {
-    int id_or_err1 = strpool_append(p, view);
-    int id_or_err2 = naivestrpool_append(n, view);
+bool both_pools_append(Strpool *p, NaiveStrpool *n, strview_t view, ID *out_id1, ID *out_id2) {
+    ID id_or_err1 = strpool_append(p, view);
+    ID id_or_err2 = naivestrpool_append(n, view);
     if (out_id1) { *out_id1 = id_or_err1; }
     if (out_id2) { *out_id2 = id_or_err2; }
-    return id_or_err1 >= 0 && id_or_err2 >= 0;
+    return ID_valid(id_or_err1) && ID_valid(id_or_err2);
 }
-bool both_pools_remove(Strpool *p, NaiveStrpool *n, int id1, int id2) {
+bool both_pools_remove(Strpool *p, NaiveStrpool *n, ID id1, ID id2) {
     int err = strpool_remove(p, id1);
     int err2 = naivestrpool_remove(n, id2);
     return err == 0 && err2 == 0;
 }
-bool both_pools_get(Strpool *p, NaiveStrpool *n, int id1, int id2, strview_t *out_view) {
+bool both_pools_get(Strpool *p, NaiveStrpool *n, ID id1, ID id2, strview_t *out_view) {
     strview_t view1 = strpool_get(p, id1);
     strview_t view2 = naivestrpool_get(n, id2);
     if (out_view) { *out_view = view1; }
@@ -149,10 +149,10 @@ void strpool_print_debug(Strpool *p) {
 
     printf(ANSI_GRE"Printing pairs (unordered)\n"ANSI_RESET);
     for (int i = 0; i < p->views.count; ++i) {
-        int userid = p->views.itemid_to_userid[i];
+        ID userid = IDmake(p->views.itemid_to_userid[i]);
         strview_t mystr = strpool_get(p, userid);
         printf("userid %d itemid %d item (offset %d size %d (%d chunks)) {%"PRIstr"}\n",
-                userid, i, p->views._items[i].offset, p->views._items[i].size, strpool__div_ceil(p->views._items[i].size, STRPOOL__CHUNK), PRIstrarg(mystr));
+                IDget(userid), i, p->views._items[i].offset, p->views._items[i].size, strpool__div_ceil(p->views._items[i].size, STRPOOL__CHUNK), PRIstrarg(mystr));
     }
     printf("\n");
 }
@@ -165,52 +165,52 @@ TEST test_general(void) {
 
     printvalnum(strpool__div_ceil(0, STRPOOL__CHUNK));
 
-    int view_id;
+    ID view_id;
     strview_t result;
 
-    result = strpool_get(&pool, 0);
+    result = strpool_get(&pool, ID_make(0));
     ASSERT(!wstrview_is_valid(result));
 
     view_id = strpool_append(&pool, cstr_SL("MIMOS"));
-    ASSERT_INT_GTE(view_id, 0);
+    ASSERT_INT_GTE(ID_get(view_id), 0);
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
-    int str_id_empty1 = view_id;
+    ID str_id_empty1 = view_id;
 
     view_id = strpool_append(&pool, cstr_SL("Hello"));
-    ASSERT(view_id != -1);
+    ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
-    int str_id_hello = view_id;
+    ID str_id_hello = view_id;
 
     view_id = strpool_append(&pool, cstr_SL(""));
-    ASSERT(view_id != -1);
+    ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
-    int str_id_empty2 = view_id;
+    ID str_id_empty2 = view_id;
 
     view_id = strpool_append(&pool, cstr_SL("1234567890"));
-    ASSERT(view_id != -1);
+    ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
-    int str_id_numbers = view_id;
+    ID str_id_numbers = view_id;
 
     view_id = strpool_append(&pool, cstr_SL("lkdafjdls;jfdaljdofvjdsofjal dkjflajd lfjladsjvfoajadasofjcvodasjfcojdaofjdaos fajodisfj aopdsuf9p8uf93q4u9cfjidjlfjadljfdsjf98aua4ajf4lkj2fcljdsoafu48u2fodjalf;j84279158jfkjdaskfjd mjf9 0sudf90ja odjf kldasfj dlsjaf 98quf qoljf ldjfqp8eq9jf eljf aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "));
     strpool_print_debug(&pool);
-    ASSERT(view_id != -1);
+    ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
-    int str_id_longtext = view_id;
+    ID str_id_longtext = view_id;
 
     /*
     view_id = strpool_append(&pool, cstr_SL(""));
@@ -223,21 +223,21 @@ TEST test_general(void) {
 
     view_id = strpool_append(&pool, cstr_SL("Crazy? I was crazy once."));
     strpool_print_debug(&pool);
-    ASSERT(view_id != -1);
+    ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
-    int str_id_crazy = view_id;
+    ID str_id_crazy = view_id;
 
     view_id = strpool_append(&pool, cstr_SL("They locked me in a room."));
     strpool_print_debug(&pool);
-    ASSERT(view_id != -1);
+    ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
-    int str_id_locked = view_id;
+    ID str_id_locked = view_id;
 
     /*strpool_print_debug(&pool);*/
 
@@ -293,52 +293,52 @@ TEST test_general(void) {
     ASSERT_INT(strpool__get_free_node_mount(&pool), 1);
 
     printf("\nRemoving id ");
-    printvalnum(str_id_longtext);
+    printvalnum(IDget(str_id_longtext));
     err = strpool_remove(&pool, str_id_longtext);
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 2);
-    str_id_longtext = -1;
+    str_id_longtext = ID_INVALID;
 
     printf("\nRemoving id ");
-    printvalnum(str_id_hello);
+    printvalnum(IDget(str_id_hello));
     err = strpool_remove(&pool, str_id_hello);
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 3);
-    str_id_hello = -1;
+    str_id_hello = ID_INVALID;
 
     printf("\nRemoving id ");
-    printvalnum(str_id_empty2);
+    printvalnum(IDget(str_id_empty2));
     err = strpool_remove(&pool, str_id_empty2);
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 3);
-    str_id_empty2 = -1;
+    str_id_empty2 = ID_INVALID;
 
     printf("\nRemoving id ");
-    printvalnum(str_id_empty1);
+    printvalnum(IDget(str_id_empty1));
     err = strpool_remove(&pool, str_id_empty1);
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 3);
-    str_id_empty1 = -1;
+    str_id_empty1 = ID_INVALID;
 
     printf("\nRemoving id ");
-    printvalnum(str_id_crazy);
+    printvalnum(IDget(str_id_crazy));
     err = strpool_remove(&pool, str_id_crazy);
     ASSERT_INT(err, 0);
     strpool_print_debug(&pool);
     ASSERT_INT(strpool__get_free_node_mount(&pool), 3);
-    str_id_crazy = -1;
+    str_id_crazy = ID_INVALID;
 
     // Adding.
 
     view_id = strpool_append(&pool, cstr_SL("Hello"));
-    ASSERT(view_id != -1);
+    ASSERT(IDvalid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     str_id_hello = view_id;
 
@@ -349,9 +349,9 @@ TEST test_general(void) {
     ASSERT_INT(err, 0);
     err = strpool_remove(&pool, str_id_numbers);
     ASSERT_INT(err, 0);
-    str_id_hello = -1;
-    str_id_locked = -1;
-    str_id_numbers = -1;
+    str_id_hello = ID_INVALID;
+    str_id_locked = ID_INVALID;
+    str_id_numbers = ID_INVALID;
 
     printfd("Removed all.");
     strpool_print_debug(&pool);
@@ -396,7 +396,7 @@ TEST test_auto(void) {
     for (int i = 0; i < CYCLES; ++i) {
         Arena scratch = arena;
         strview_t view = create_random_string(i * 8, &scratch);
-        int id1, id2;
+        ID id1, id2;
         ASSERT(both_pools_append(p, n, view, &id1, &id2));
         ASSERT(both_pools_get(p, n, id1, id2, NULL));
         VecPair_append(&saved_ids, (Pair){id1, id2});
@@ -420,7 +420,7 @@ TEST test_auto(void) {
     for (int i = 0; i < CYCLES; ++i) {
         Arena scratch = arena;
         strview_t view = create_random_string(i * 8, &scratch);
-        int id1, id2;
+        ID id1, id2;
         ASSERT(both_pools_append(p, n, view, &id1, &id2));
         ASSERT(both_pools_get(p, n, id1, id2, NULL));
         VecPair_append(&saved_ids, (Pair){id1, id2});
@@ -486,7 +486,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         if (str_size <= 0) { return 0; }
         char *str_data = (char*)arenady_try_get(&arenady, sizeof(char), alignof(char), str_size);
         wassert_live(str_data);
-        int id1, id2;
+        ID id1, id2;
         strview_t view = {str_data, str_size};
         wassert_live(both_pools_append(p, n, view, &id1, &id2));
         strview_t out_view;
@@ -496,8 +496,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         touched = true;
     }
     else if (*action == GET) {
-        const int *id1 = arenady_try_get_one(&arenady, int);
-        const int *id2 = arenady_try_get_one(&arenady, int);
+        const ID *id1 = arenady_try_get_one(&arenady, ID);
+        const ID *id2 = arenady_try_get_one(&arenady, ID);
         if (!id1 || !id2) { return 0; }
         both_pools_get(p, n, *id1, *id2, NULL);
     }

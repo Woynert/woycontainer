@@ -34,6 +34,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include "portable_utils.h"
 
 
 #ifndef STRPOOL_STR
@@ -84,12 +85,12 @@ typedef struct Strpool {
 int          strpool_create(Strpool *p);
 int          strpool_create_with_allocator(Strpool *p, STRPOOL__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data);
 void         strpool_destroy(Strpool *p);
-int          strpool_append(Strpool *p, STRPOOL_STR view);
-STRPOOL_STR  strpool_get(const Strpool *p, int view_id);
+ID           strpool_append(Strpool *p, STRPOOL_STR view);
+STRPOOL_STR  strpool_get(const Strpool *p, ID view_id);
 STRPOOL_STR  strpool_get_from_view(const Strpool *p, strpool__view view);
-int          strpool_remove(Strpool *p, int view_id);
+int          strpool_remove(Strpool *p, ID view_id);
 void         strpool_clear(Strpool *p);
-int          strpool_get_next_id(Strpool *p);
+ID           strpool_get_next_id(Strpool *p);
 size_t       strpool_report_memory(const Strpool *p);
 
 int            strpool__grow(Strpool *p, int min_size);
@@ -261,8 +262,8 @@ int strpool__find_space(const Strpool *p, int space, int *out_i_prev_node) {
 }
 
 
-/// @Returns id, or -1 on error.
-int strpool_append(Strpool *p, STRPOOL_STR view) {
+/// @Returns id; On error returns INVALID ID. (Check with ID_valid).
+ID strpool_append(Strpool *p, STRPOOL_STR view) {
     int i_node_prev = -1;
     int i_node = -1;
 
@@ -273,17 +274,17 @@ int strpool_append(Strpool *p, STRPOOL_STR view) {
         enum { DEFAULT_CAP = 8, };
         int new_cap = p->capacity == 0 ? DEFAULT_CAP : p->capacity * 2;
         int err = strpool__grow(p, strpool__int_max(new_cap, view.size));
-        if (err) { return -1; }
+        if (err) { return ID_INVALID; }
         i_node = strpool__find_space(p, view.size, &i_node_prev);
-        if (i_node == -1) { return -1; }
+        if (i_node == -1) { return ID_INVALID; }
     }
 
     // Check early for view space (for easy bail out in case of OOM).
 
     int view_id = strpool__view_Slot_append(&p->views, (strpool__view) { 0 });
-    if (view_id == -1) { return -1; }
+    if (view_id == -1) { return ID_INVALID; }
     strpool__view *new_view = strpool__view_Slot_get(&p->views, view_id);
-    if (!new_view) { return -1; }
+    if (!new_view) { return ID_INVALID; }
 
     // Calculate chunks.
 
@@ -309,24 +310,24 @@ int strpool_append(Strpool *p, STRPOOL_STR view) {
     if (view.size > 0) { memcpy(writing_area, view.data, (size_t)view.size); }
     new_view->offset = i_node;
     new_view->size = view.size;
-    return view_id;
+    return ID_make(view_id);
 }
 
 
 /// @Returns would-be next id if a new String where to be inserted.
-int strpool_get_next_id(Strpool *p) { return strpool__view_Slot_get_next_id(&p->views); }
+ID strpool_get_next_id(Strpool *p) { return ID_make(strpool__view_Slot_get_next_id(&p->views)); }
 
 
-int strpool_remove(Strpool *p, int view_id) {
+int strpool_remove(Strpool *p, ID view_id) {
     int i_curr;
     int view_chunks;
     {
-        strpool__view *view = strpool__view_Slot_get(&p->views, view_id);
+        strpool__view *view = strpool__view_Slot_get(&p->views, ID_get(view_id));
         if (!view) { return -1; }
         i_curr = view->offset;
         view_chunks = strpool__div_ceil(view->size, STRPOOL__CHUNK);
     }
-    int err = strpool__view_Slot_pop(&p->views, view_id);
+    int err = strpool__view_Slot_pop(&p->views, ID_get(view_id));
     (void)err; // @Note. Probably want to print a warning here.
     if (view_chunks == 0) { return 0; } // Empty string.
     strpool__integrate_new_free_node(p, i_curr, view_chunks);
@@ -340,8 +341,8 @@ inline STRPOOL_STR strpool_get_from_view(const Strpool *p, strpool__view view) {
 
 
 /// @Returns view or INVALID_VIEW If not found. An invalid view is .data == NULL.
-STRPOOL_STR strpool_get(const Strpool *p, int view_id) {
-    strpool__view *view = strpool__view_Slot_get(&p->views, view_id);
+STRPOOL_STR strpool_get(const Strpool *p, ID view_id) {
+    strpool__view *view = strpool__view_Slot_get(&p->views, ID_get(view_id));
     if (!view) { return (STRPOOL_STR) { .data = NULL, .size = 0, }; }
     return strpool_get_from_view(p, *view);
 }
@@ -356,6 +357,7 @@ size_t strpool_report_memory(const Strpool *p) {
 
 
 void strpool_clear(Strpool *p) {
+    if (p->capacity <= 0) { return; }
     p->i_first_free_node = -1;
     strpool__view_Slot_clear(&p->views);
     memset(p->nodes, 0, sizeof(strpool__Node) * (size_t)p->capacity);

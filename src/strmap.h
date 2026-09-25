@@ -36,7 +36,7 @@
 
 typedef struct STRMAP__PRI(Pair) {
     STRMAP__TYPE value;
-    int key;
+    ID key; // ID to strpool.
 } STRMAP__PRI(Pair);
 
 
@@ -96,7 +96,7 @@ int                        pri(init)                   (Strmap *m, STRMAP__ALLOC
 static inline int          pri(hash_and_get_bucket_id) (Strmap *m, strview_t key);
 static inline pri(Bucket)* pri(hash_and_get_bucket)    (Strmap *m, strview_t key);
 void                       pri(rehash_if_needed)       (Strmap *old_m);
-static inline int          pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, int strpool_key, STRMAP__TYPE value);
+static inline int          pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, ID strpool_key, STRMAP__TYPE value);
 
 
 int pri(grow)(Strmap *m, int new_size) {
@@ -264,7 +264,7 @@ int pub(upsert)(Strmap *m, strview_t key, STRMAP__TYPE value) {
     // Entry exists already?
 
     for (int i = 0; i < bucket->pairs.size; ++i) {
-        int str_internal_storage_key = bucket->pairs.items[i].key;
+        ID str_internal_storage_key = bucket->pairs.items[i].key;
         strview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
 
         if (wstrview_equals(stored_key, key))
@@ -277,8 +277,8 @@ int pub(upsert)(Strmap *m, strview_t key, STRMAP__TYPE value) {
 
     // Register new string key.
 
-    int strpool_key_id = strpool_append(&m->strpool, key);
-    if (strpool_key_id < 0) { return -1; }
+    ID strpool_key_id = strpool_append(&m->strpool, key);
+    if (!ID_valid(strpool_key_id)) { return -1; }
 
     // Set pair.
 
@@ -293,7 +293,7 @@ static STRMAP__TYPE *pub(get)(Strmap *m, strview_t key) {
     pri(Bucket) *bucket = pri(hash_and_get_bucket)(m, key);
 
     for (int i = 0; i < bucket->pairs.size; ++i) {
-        int str_internal_storage_key = bucket->pairs.items[i].key;
+        ID str_internal_storage_key = bucket->pairs.items[i].key;
         strview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
 
         if (wstrview_equals(stored_key, key))
@@ -335,7 +335,7 @@ static int pub(remove)(Strmap *m, strview_t key) {
     pri(Bucket) *bucket = pri(hash_and_get_bucket)(m, key);
 
     for (int i = 0; i < bucket->pairs.size; ++i) {
-        int str_internal_storage_key = bucket->pairs.items[i].key;
+        ID str_internal_storage_key = bucket->pairs.items[i].key;
         strview_t stored_key = strpool_get(&m->strpool, str_internal_storage_key);
 
         if (wstrview_equals(stored_key, key))
@@ -356,7 +356,7 @@ static int pub(remove)(Strmap *m, strview_t key) {
 
 
 /// @Returns error.
-static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, int strpool_key, STRMAP__TYPE value) {
+static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, ID strpool_key, STRMAP__TYPE value) {
     int da_pair_id = pri(Pair_da_append)(&bucket->pairs, (pri(Pair)) { .key = strpool_key, .value = value, });
     if (da_pair_id < 0) {
         return -1;
@@ -370,7 +370,7 @@ static inline int pri(set_pair_with_final_key)(Strmap *m, pri(Bucket) *bucket, i
 bool pub(it_next)(const Strmap *m, pub(It) *it) {
     for (; it->__bucket_id < m->buckets.size; ++it->__bucket_id, it->__pair_id = 0) {
         while (it->__pair_id < m->buckets.items[it->__bucket_id].pairs.size) {
-            int key_str_id = m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].key;
+            ID key_str_id = m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].key;
             it->value = &m->buckets.items[it->__bucket_id].pairs.items[it->__pair_id].value;
             it->key = strpool_get(&m->strpool, key_str_id);
             ++it->__pair_id;
