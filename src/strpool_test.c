@@ -335,7 +335,7 @@ TEST test_general(void) {
     // Adding.
 
     view_id = strpool_append(&pool, cstr_SL("Hello"));
-    ASSERT(IDvalid(view_id));
+    ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
     printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));

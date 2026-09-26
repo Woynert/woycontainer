@@ -26,11 +26,19 @@ compile:
 test:
 	meson test --interactive -C build
 
+fuzz:
+	make compile && \
+	./build/wmap_test_fuzzy    -runs=5000 && \
+	./build/wmapstr_test_fuzzy -runs=5000 && \
+	./build/strpool_test_fuzzy -runs=5000 && \
+	echo "done."
+
 coverage:
 	ninja coverage-html -C build
 
 coverageClean:
 	find build -name "*.profraw" -delete
 	find build -name "*.gcda" -delete
+	find build -name "*.gcno" -delete
 
 

@@ -160,9 +160,9 @@ typedef struct {
 } Fruit;
 #define makefruit(name) ((Fruit) { name })
 
-#define UMAPSTR__TYPE Fruit
-#define UMAPSTR__NAMESPACE Map_Fruit
-#include "umapstr.h"
+#define WMAPSTR__TYPE Fruit
+#define WMAPSTR__NAMESPACE Map_Fruit
+#include "wmapstr.h"
 #define Map Map_Fruit
 #define MAP__TYPE Fruit
 
@@ -182,7 +182,7 @@ typedef struct Item2Find {
 void map_fruit_print(Map *m) {
     printfd("\nPrinting map.");
     int count = 0;
-    Map_Fruit_It it = { 0 };
+    Map_Fruit_It it = Map_Fruit_make_it(m);
     while (Map_Fruit_it_next(m, &it)) {
         printf("(\"%"PRIstr"\") = (%s)\n", PRIstrarg(it.key), it.value->name);
         ++count;
@@ -202,9 +202,8 @@ bool should_find_these(const Map *m, MAP__TYPE *p_items, const int item_amount) 
         items[i].item = p_items[i];
     }
 
-    Map_Fruit_It it = { 0 };
+    Map_Fruit_It it = Map_Fruit_make_it(m);
     while (Map_Fruit_it_next(m, &it)) {
-
 
         // See if it corresponds to one item.
         for (int k = 0; k < item_amount; ++k) {
@@ -314,8 +313,7 @@ TEST test_general(void) {
 
     // Try to gain some space back.
 
-    err = Map_Fruit_remove(m, key_apple);
-    ASSERT_INT(err, 0);
+    Map_Fruit_remove(m, key_apple);
     ASSERT_INT(Map_Fruit_pair_count(m), 2);
     map_fruit_print(m);
     {
@@ -323,11 +321,9 @@ TEST test_general(void) {
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
-    err = Map_Fruit_remove(m, key_apple);
-    ASSERT_INT(err, -1);
+    Map_Fruit_remove(m, key_apple);
 
-    err = Map_Fruit_remove(m, key_pear);
-    ASSERT_INT(err, 0);
+    Map_Fruit_remove(m, key_pear);
     ASSERT_INT(Map_Fruit_pair_count(m), 1);
     
     printfd("\n---->>> Removed APPLE and Pear, should remain Banana.");
@@ -393,15 +389,15 @@ TEST test_general(void) {
     // @Note. This is not a good way to clear the map, it's slow.
 
     while (Map_Fruit_pair_count(m)) {
-        Map_Fruit_It it = { 0 };
+        Map_Fruit_It it = Map_Fruit_make_it(m);
         if (!Map_Fruit_it_next(m, &it)) { break; }
 
-        err = Map_Fruit_remove(m, it.key);
-        if (err != 0) {
-            printfd(ANSI_RED"Failed to remove: %"PRIstr" = %s", PRIstrarg(it.key), it.value->name);
-        } else {
-            printfd(ANSI_GRE"Removed: %"PRIstr" = %s", PRIstrarg(it.key), it.value->name);
-        }
+        Map_Fruit_remove(m, it.key);
+        /*if (err != 0) {*/
+            /*printfd(ANSI_RED"Failed to remove: %"PRIstr" = %s", PRIstrarg(it.key), it.value->name);*/
+        /*} else {*/
+            /*printfd(ANSI_GRE"Removed: %"PRIstr" = %s", PRIstrarg(it.key), it.value->name);*/
+        /*}*/
         ASSERT_INT(err, 0);
     }
 

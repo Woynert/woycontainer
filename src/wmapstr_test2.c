@@ -6,7 +6,7 @@
 #include "arenady.h"
 #include "wstrview.h"
 
-#define DYNA__TYPE int
+#define DYNA__TYPE ID
 #define DYNA__NAMESPACE Vec_Int
 #include "da.h"
 
@@ -18,7 +18,7 @@
 #define DYNA__NAMESPACE Vec_Strview
 #include "da.h"
 
-#define MAKEVIEW__TYPE int
+#define MAKEVIEW__TYPE ID
 #define MAKEVIEW__NAMESPACE View_Int
 #include "make_view.h"
 
@@ -37,7 +37,7 @@
 
 /// START [NAIVE MAP]
 typedef struct {
-    int key_id;
+    ID key_id;
     int value;
 } NaivePair;
 #define DYNA__TYPE NaivePair
@@ -68,8 +68,8 @@ int *naive_map_get(const NaiveMap *m, strview_t key) {
 int naive_map_upsert(NaiveMap *m, strview_t key, int item) {
     int *saved_item = naive_map_get(m, key);
     if (saved_item) { *saved_item = item; return 0; } // Update.
-    int id = strpool_append(&m->strpool, key);
-    if (id == -1) { return -1; }
+    ID id = strpool_append(&m->strpool, key);
+    if (!ID_valid(id)) { return -1; }
     Vec_NaivePair_append(&m->pairs, (NaivePair){.key_id=id, .value=item});
     return 0;
 }
@@ -225,7 +225,7 @@ bool check_integrity(MapStrInt *w, IntegrityTest integrity, Arena scratch) {
                 while (ID_valid(node)) {
                     bool found = false;
                     for (int l = 0; l < keys.size; ++l) {
-                        if (keys.items[l] == m->keys.items[ID_get(node)]) {
+                        if (ID_equals(keys.items[l], m->keys.items[ID_get(node)])) {
                             found = true; Vec_Int_remove_at(&keys, l); break;
                         }
                     }
@@ -235,7 +235,7 @@ bool check_integrity(MapStrInt *w, IntegrityTest integrity, Arena scratch) {
                 }
                 if (keys.size != 0) {
                     printferr("Couldn't find all.");
-                    for (int l = 0; l < keys.size; ++l) { printferr("Missing %d", keys.items[i]); }
+                    for (int l = 0; l < keys.size; ++l) { printferr("Missing %d", ID_get(keys.items[i])); }
                     return false;
                 }
             }
@@ -254,7 +254,7 @@ bool check_integrity(MapStrInt *w, IntegrityTest integrity, Arena scratch) {
                 while (ID_valid(node)) {
                     bool found = false;
                     for (int l = 0; l < keys.size; ++l) {
-                        if (keys.items[l] == m->keys.items[ID_get(node)]) {
+                        if (ID_equals(keys.items[l], m->keys.items[ID_get(node)])) {
                             found = true; Vec_Int_remove_at(&keys, l); break;
                         }
                     }
@@ -263,7 +263,7 @@ bool check_integrity(MapStrInt *w, IntegrityTest integrity, Arena scratch) {
                 }
                 if (keys.size != 0) {
                     printferr("Couldn't find all.");
-                    for (int l = 0; l < keys.size; ++l) { printferr("Missing %d", keys.items[i]); }
+                    for (int l = 0; l < keys.size; ++l) { printferr("Missing %d", ID_get(keys.items[i])); }
                     return false;
                 }
             }
@@ -277,8 +277,8 @@ bool check_integrity(MapStrInt *w, IntegrityTest integrity, Arena scratch) {
         ID node = m->first_node;
         while(ID_valid(node)) {
             if (i >= ordered_keys.size) { printferr("Wrong amount of keys."); return false; }
-            printfd("%d !=? %d", ordered_keys.items[i], m->keys.items[ID_get(node)]);
-            if (ordered_keys.items[i] != m->keys.items[ID_get(node)]) { printferr("Wrong order."); return false; }
+            printfd("%d !=? %d", IDget(ordered_keys.items[i]), IDget(m->keys.items[ID_get(node)]));
+            if (!ID_equals(ordered_keys.items[i], m->keys.items[ID_get(node)])) { printferr("Wrong order."); return false; }
             node = m->next.items[ID_get(node)];
             ++i;
         }
@@ -291,8 +291,8 @@ bool check_integrity(MapStrInt *w, IntegrityTest integrity, Arena scratch) {
         ID node = m->last_node;
         while(ID_valid(node)) {
             if (i >= ordered_keys.size) { printferr("Wrong amount of keys."); return false; }
-            printfd("%d !=? %d", ordered_keys.items[i], m->keys.items[ID_get(node)]);
-            if (ordered_keys.items[i] != m->keys.items[ID_get(node)]) { printferr("Wrong order."); return false; }
+            printfd("%d !=? %d", IDget(ordered_keys.items[i]), IDget(m->keys.items[ID_get(node)]));
+            if (!ID_equals(ordered_keys.items[i], m->keys.items[ID_get(node)])) { printferr("Wrong order."); return false; }
             node = m->prev.items[ID_get(node)];
             --i;
         }
@@ -314,15 +314,15 @@ void shuffle_collision_nodes_same_bucket(MapStrInt *w, const int iterations, Are
         if (MapStrInt__Table_slot_is_empty(m, bucket)) { continue; }
         ID node = bucket;
         while (ID_valid(node)) {
-            Vec_Int_append(&bucket_nodes, ID_get(node));
+            Vec_Int_append(&bucket_nodes, node);
             node = m->bucket_next.items[ID_get(node)];
         }
 
         // Now shuffle them all like a maniac.
         for (int k = 0; k < iterations; ++k) {
-            int a = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
-            int b = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
-            MapStrInt__Table__swap_nodes_same_bucket(m, ID_make(a), ID_make(b));
+            ID a = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
+            ID b = bucket_nodes.items[rand_range(0, bucket_nodes.size-1)];
+            MapStrInt__Table__swap_nodes_same_bucket(m, a, b);
         }
     }
 }
@@ -336,7 +336,7 @@ void map_print(MapStrInt *w) {
             m->pair_count, m->collision_count, ID_get(m->first_node), ID_get(m->last_node));
     printf("\nkeys:    ");
     for (int i = 0; i < m->capacity; ++i) {
-        printf("%5d|", m->keys.items[i]);
+        printf("%5d|", ID_get(m->keys.items[i]));
         if (i+1 == m->bucket_count) { printf("|"); }
     }
     printf("\nvalueid: ");
@@ -382,7 +382,7 @@ void map_print_order(MapStrInt *w, bool backwards) {
     ID node = m->first_node;
     printf("Order Forward:\n");
     while(ID_valid(node)) {
-        printf("%d,", m->keys.items[ID_get(node)]);
+        printf("%d,", ID_get(m->keys.items[ID_get(node)]));
         node = m->next.items[ID_get(node)];
         if (++cycles > MAX_CYCLES) { printf("\n"); return; }
     }
@@ -392,7 +392,7 @@ void map_print_order(MapStrInt *w, bool backwards) {
     printf("Order Backwards:\n");
     node = m->last_node;
     while(ID_valid(node)) {
-        printf("%d,", m->keys.items[ID_get(node)]);
+        printf("%d,", IDget(m->keys.items[ID_get(node)]));
         node = m->prev.items[ID_get(node)];
         if (++cycles > MAX_CYCLES) { printf("\n"); return; }
     }
@@ -409,7 +409,7 @@ void map_print_bucket_chains(MapStrInt *w) {
         if (!ID_valid(m->val_ids.items[ID_get(id)])) { printf("\n"); continue; }
         while (ID_valid(id)) {
             //printf("%d"ANSI_GRE"(%d)"ANSI_RESET",", ID_get(id), m->keys.items[ID_get(id)]);
-            printf("%d,", m->keys.items[ID_get(id)]);
+            printf("%d,", IDget(m->keys.items[ID_get(id)]));
             id = m->bucket_next.items[ID_get(id)];
 
             if (++cycles > max_cycles) { return; }
@@ -642,8 +642,8 @@ TEST test_auto(void) {
         Vec_Int keys = Vec_Int_create_with_allocator(arena_allocator, &scratch);
         MapStrInt_It it = MapStrInt_make_it(m);
         while(MapStrInt_it_next(m, &it)) {
-            int key_id = strpool_append(&saved_keys, it.key);
-            ASSERT(key_id != -1);
+            ID key_id = strpool_append(&saved_keys, it.key);
+            ASSERT(ID_valid(key_id));
             Vec_Int_append(&keys, key_id);
         }
         for (dyna_foreach_gnu(iter, keys)) {

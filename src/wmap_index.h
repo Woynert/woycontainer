@@ -77,6 +77,7 @@ void    pub(remove)(WMapIndex *m, ID i);
 int     pub(grow)(WMapIndex *m, int new_cap);
 static inline int pub(set_new_pair)(WMapIndex *m, ID i_bucket_prev, ID i_new, KEY key, ID value_id);
 static inline bool pub(slot_is_empty(const WMapIndex *m, ID i)) { return !ID_valid(m->val_ids.items[ID_get(i)]); }
+void    pub(clear)(WMapIndex *m);
 
 void    pri(clear)(WMapIndex *m, int from, int to);
 void    pri(swap_nodes_same_bucket)(WMapIndex *m, const ID a, const ID b);
@@ -110,14 +111,25 @@ void pub(free)(WMapIndex *m) {
 }
 
 void pri(clear)(WMapIndex *m, int from, int to) {
-    memset(m->keys.items    + from, 0, sizeof(m->keys.items[0]) * (size_t)(to - from));
-    memset(m->next.items    + from, 0, sizeof(m->next.items[0]) * (size_t)(to - from));
-    memset(m->prev.items    + from, 0, sizeof(m->prev.items[0]) * (size_t)(to - from));
+    if ((to - from) <= 0) { return; }
+    // @Note. Only [val_ids] determines if the slot is empty.
+    //        So it shouldn't be necessary to clear the rest.
     memset(m->val_ids.items + from, 0, sizeof(m->val_ids.items[0]) * (size_t)(to - from));
-    memset(m->bucket_next.items  + from, 0, sizeof(m->bucket_next.items[0]) * (size_t)(to - from));
-    memset(m->bucket_prev.items  + from, 0, sizeof(m->bucket_prev.items[0]) * (size_t)(to - from));
+    //memset(m->keys.items    + from, 0, sizeof(m->keys.items[0]) * (size_t)(to - from));
+    //memset(m->next.items    + from, 0, sizeof(m->next.items[0]) * (size_t)(to - from));
+    //memset(m->prev.items    + from, 0, sizeof(m->prev.items[0]) * (size_t)(to - from));
+    //memset(m->bucket_next.items  + from, 0, sizeof(m->bucket_next.items[0]) * (size_t)(to - from));
+    //memset(m->bucket_prev.items  + from, 0, sizeof(m->bucket_prev.items[0]) * (size_t)(to - from));
 }
 
+
+void pub(clear)(WMapIndex *m) {
+    pri(clear)(m, 0, m->capacity);
+    m->pair_count = 0;
+    m->collision_count = 0;
+    m->first_node = ID_INVALID;
+    m->last_node = ID_INVALID;
+}
 
 int pub(grow)(WMapIndex *m, int new_cap) {
     if (pri(Arr_Key_resize)(&m->keys, new_cap))       { return -1; }
@@ -148,12 +160,17 @@ static inline int pub(set_new_pair)(WMapIndex *m, ID i_bucket_prev, ID i_new, KE
     if (ID_valid(i_bucket_prev)) {
         m->bucket_next.items[ID_get(i_bucket_prev)] = i_new;
         m->bucket_prev.items[ID_get(i_new)] = i_bucket_prev;
+    } else {
+        m->bucket_prev.items[ID_get(i_new)] = ID_INVALID;
     }
     if (ID_valid(m->last_node)) {
-        m->prev.items[ID_get(i_new)] = m->last_node;
         m->next.items[ID_get(m->last_node)] = i_new;
+        m->prev.items[ID_get(i_new)] = m->last_node;
+    } else {
+        m->prev.items[ID_get(i_new)] = ID_INVALID;
     }
     m->bucket_next.items[ID_get(i_new)] = ID_INVALID;
+    m->next.items[ID_get(i_new)] = ID_INVALID;
     m->keys.items[ID_get(i_new)] = key;
     m->val_ids.items[ID_get(i_new)] = value_id;
     m->last_node = i_new;
@@ -293,7 +310,8 @@ void pub(remove)(WMapIndex *m, ID i) {
         if (ID_valid(prev)) { m->bucket_next.items[ID_get(prev)] = ID_valid(next) ? next : ID_INVALID; }
         if (ID_valid(next)) { m->bucket_prev.items[ID_get(next)] = ID_valid(prev) ? prev : ID_INVALID; }
         // Cleanup.
-        m->keys.items[ID_get(i)] = 0; // No need to clear the key... But it feels right :(
+        // ↓↓↓ No need to clear the key... But it feels right :(
+        memset(&m->keys.items[ID_get(i)], 0, sizeof(m->keys.items[ID_get(i)]));
         m->val_ids.items[ID_get(i)] = ID_INVALID;
         m->next.items[ID_get(i)] = ID_INVALID;
         m->prev.items[ID_get(i)] = ID_INVALID;

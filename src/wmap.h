@@ -119,6 +119,7 @@ int     pub(create)(WMap *m);
 int     pub(create_with_allocator)(WMap *m, WMAP__ALLOC_PROTOTYPE(*allocator), void *allocator_userdata);
 void    pub(set_userdata)(WMap *m, void *data) { m->userdata = data; }
 void    pub(free)(WMap *m);
+void    pub(clear)(WMap *m);
 int     pub(upsert)(WMap *m, KEY key, TYPE item);
 void    pub(remove)(WMap *m, KEY key);
 TYPE *  pub(get)(WMap *m, KEY key);
@@ -151,7 +152,10 @@ void pub(free)(WMap *m) {
     *m = (WMap) { 0 };
 }
 
-
+void pub(clear)(WMap *m) {
+    pri(Table_clear)(&m->table);
+    pri(Slot_Value_clear)(&m->values);
+}
 
 
 int pri(rehash_if_needed)(WMap *old_m) {

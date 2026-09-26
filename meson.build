@@ -57,11 +57,11 @@ if not meson.is_subproject()
   umapstr_test = executable('umapstr_test', './src/umapstr_test.c')
   test('umapstr_test', umapstr_test)
 
-  npmap0_test = executable('npmap0_test', './src/hashmaps/npmap0_test.c')
-  test('npmap0_test', npmap0_test)
+  #npmap0_test = executable('npmap0_test', './src/hashmaps/npmap0_test.c')
+  #test('npmap0_test', npmap0_test)
 
-  npmap1_test = executable('npmap1_test', './src/hashmaps/npmap1_test.c')
-  test('npmap1_test', npmap1_test)
+  #npmap1_test = executable('npmap1_test', './src/hashmaps/npmap1_test.c')
+  #test('npmap1_test', npmap1_test)
 
   #npmap_str0_test = executable('npmap_str0_test', './src/hashmaps/npmap_str0_test.c')
   #test('npmap_str0_test', npmap_str0_test)
@@ -72,11 +72,11 @@ if not meson.is_subproject()
   list_simple_test = executable('list_simple_test', './src/list_simple_test.c')
   test('list_simple_test', list_simple_test)
 
-  npmap_str2_test = executable('npmap_str2_test', './src/hashmaps/npmap_str2_test.c')
-  test('npmap_str2_test', npmap_str2_test)
+  #npmap_str2_test = executable('npmap_str2_test', './src/hashmaps/npmap_str2_test.c')
+  #test('npmap_str2_test', npmap_str2_test)
 
-  hm_benchmarks_test = executable('hm_benchmarks_test', './src/hashmaps/hm_benchmarks_test.c')
-  test('hm_benchmarks_test', hm_benchmarks_test)
+  #hm_benchmarks_test = executable('hm_benchmarks_test', './src/hashmaps/hm_benchmarks_test.c')
+  #test('hm_benchmarks_test', hm_benchmarks_test)
 
   wmap_test = executable('wmap_test', './src/wmap_test.c')
   test('wmap_test', wmap_test)

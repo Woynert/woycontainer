@@ -22,11 +22,11 @@ uint64_t strumap__hash(strview_t view) {
     // https://nullprogram.com/blog/2025/01/19/
 }
 
-bool strumap__noop(int a, int b, void *data) {
+bool strumap__noop(ID a, ID b, void *data) {
     (void)a; (void)b; (void)data; wassert_msg(false, "Should never reach.");
 }
 
-uint64_t strumap__key_hash(int key, void *data) {
+uint64_t strumap__key_hash(ID key, void *data) {
     Strpool *strpool = (Strpool*)data;
     wassert(wstrview_is_valid(strpool_get(strpool, key)));
     return strumap__hash(strpool_get(strpool, key));
@@ -42,7 +42,7 @@ uint64_t strumap__key_hash(int key, void *data) {
 #define UMAPSTR__PRI(name) UMAPSTR__TOKCAT(UMAPSTR__TOKCAT(UMAPSTR__NAMESPACE, __), name)
 
 #define UMAP__TYPE UMAPSTR__TYPE
-#define UMAP__KEY int
+#define UMAP__KEY ID
 #define UMAP__KEY_EQUAL strumap__noop
 #define UMAP__KEY_HASH  strumap__key_hash
 #define UMAP__NAMESPACE UMAPSTR__PRI(Umap)
@@ -123,8 +123,8 @@ int pub(upsert)(Strumap *m, strview_t key_str, UMAPSTR__TYPE value) {
     }
     // Else insert.
     if (err) { printferr("Couldn't rehash."); }
-    int key = strpool_append(&m->strpool, key_str);
-    if (key < 0) { return -1; }
+    ID key = strpool_append(&m->strpool, key_str);
+    if (!ID_valid(key)) { return -1; }
     err = pri(Umap__set_pair_with_final_key)(&m->umap, bucket, key, value);
     if (err) { strpool_remove(&m->strpool, key); }
     return err;
@@ -163,7 +163,7 @@ int pub(remove)(Strumap *m, strview_t key_str) {
 bool pub(it_next)(const Strumap *m, pub(It) *it) {
     for (; it->__bucket_id < m->umap.buckets.size; ++it->__bucket_id, it->__pair_id = 0) {
         while (it->__pair_id < m->umap.buckets.items[it->__bucket_id].pairs.size) {
-            int key_internal = m->umap.buckets.items[it->__bucket_id].pairs.items[it->__pair_id].key;
+            ID key_internal = m->umap.buckets.items[it->__bucket_id].pairs.items[it->__pair_id].key;
             it->key = strpool_get(&m->strpool, key_internal);
             it->value = &m->umap.buckets.items[it->__bucket_id].pairs.items[it->__pair_id].value;
             ++it->__pair_id;

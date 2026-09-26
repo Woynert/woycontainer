@@ -63,7 +63,9 @@
     int _woytest_passed = 0; \
     printf("TESTS STARTING ("WOYTEST_BOLD __FILE_NAME__ WOYTEST_RESET")\n---\n");
 
-#define RUN_TEST(FUNC)                                                          \
+/*
+// @Note(woy): This one is standard compliant, unlike RUN_TEST(FUNC, ...).
+#define RUN_TEST_NO_ARGS(FUNC)                                                  \
     do {                                                                        \
         ++_woytest_count;                                                       \
             printf("%s[ RUN      ]%s "#FUNC"\n", WOYTEST_GREEN, WOYTEST_RESET); \
@@ -74,8 +76,20 @@
             printf("%s[  FAILED  ]%s "#FUNC"\n", WOYTEST_RED, WOYTEST_RESET);   \
         }                                                                       \
     } while(0)
+*/
 
 
+#define RUN_TEST(FUNC, ...)                                                     \
+    do {                                                                        \
+        ++_woytest_count;                                                       \
+            printf("%s[ RUN      ]%s "#FUNC"\n", WOYTEST_GREEN, WOYTEST_RESET); \
+        if ((FUNC)( __VA_ARGS__ )) {                                            \
+            printf("%s[       OK ]%s "#FUNC"\n", WOYTEST_GREEN, WOYTEST_RESET); \
+            ++_woytest_passed;                                                  \
+        } else {                                                                \
+            printf("%s[  FAILED  ]%s "#FUNC"\n", WOYTEST_RED, WOYTEST_RESET);   \
+        }                                                                       \
+    } while(0)
 
 
 #define TESTS_SHOW_RESULTS()                                 \
