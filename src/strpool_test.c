@@ -152,7 +152,7 @@ void strpool_print_debug(Strpool *p) {
         ID userid = IDmake(p->views.itemid_to_userid[i]);
         strview_t mystr = strpool_get(p, userid);
         printf("userid %d itemid %d item (offset %d size %d (%d chunks)) {%"PRIstr"}\n",
-                IDget(userid), i, p->views._items[i].offset, p->views._items[i].size, strpool__div_ceil(p->views._items[i].size, STRPOOL__CHUNK), PRIstrarg(mystr));
+                IDget(userid), i, p->views._items[i].offset, p->views._items[i].bytes, strpool__div_ceil(p->views._items[i].bytes, STRPOOL__CHUNK), PRIstrarg(mystr));
     }
     printf("\n");
 }

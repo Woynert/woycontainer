@@ -1,3 +1,12 @@
+/*
+   This "Pool" seems to be my own old naive implementation of the current "Slot".
+
+   The main difference is that this one uses a flag to determine whether a slot
+   is available or otherwise occupied. So iteration of elements must skip
+   unused slots.
+
+   */
+
 #include <limits.h>
 #include <stdlib.h>
 #include <stdbool.h>

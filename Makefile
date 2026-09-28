@@ -31,6 +31,7 @@ fuzz:
 	./build/wmap_test_fuzzy    -runs=5000 && \
 	./build/wmapstr_test_fuzzy -runs=5000 && \
 	./build/strpool_test_fuzzy -runs=5000 && \
+	./build/slotpool_test_fuzzy -runs=10000 && \
 	echo "done."
 
 coverage:

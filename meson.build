@@ -87,6 +87,9 @@ if not meson.is_subproject()
   wmapstr_test2 = executable('wmapstr_test2', './src/wmapstr_test2.c')
   test('wmapstr_test2', wmapstr_test2)
 
+  slotpool_test = executable('slotpool_test', './src/slotpool_test.c')
+  test('slotpool_test', slotpool_test)
+
   # FUZZY TESTS
 
   strpool_test_fuzzy = executable('strpool_test_fuzzy', './src/strpool_test.c',
@@ -98,6 +101,10 @@ if not meson.is_subproject()
     link_args: '-fsanitize=fuzzer',)
 
   wmapstr_test_fuzzy = executable('wmapstr_test_fuzzy', './src/wmapstr_test2.c',
+    c_args: ['-fsanitize=fuzzer', '-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION'],
+    link_args: '-fsanitize=fuzzer',)
+
+  slotpool_test_fuzzy = executable('slotpool_test_fuzzy', './src/slotpool_test.c',
     c_args: ['-fsanitize=fuzzer', '-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION'],
     link_args: '-fsanitize=fuzzer',)
 

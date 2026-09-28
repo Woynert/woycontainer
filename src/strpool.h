@@ -5,8 +5,8 @@
    FEATURES:
    * Pro: Stable user facing ids.
    * Pro: Unlimited growth.
-   * Pro: Fast insert.
-   * Pro: Fast deletion.
+   * Pro: Fast insert. ???
+   * Pro: Fast deletion. ???
    * Neutral: Finds space using a "free list". (Red-Black tree would be better).
    * Con: Previously deleted ids will be reutilized often.
 
@@ -20,11 +20,6 @@
         #include "strpool.h"
 
     If not defined by default it will use "wstrview.h".
-
-    NOTES:
-
-    * -1 ID means NULL, it'd be probably better to make 0 NULL instead.
-
 */
 
 #ifndef STRPOOL_GENERAL
@@ -49,7 +44,7 @@ static STRPOOL__ALLOC_PROTOTYPE(strpool__default_allocator);
 
 typedef struct strpool__view {
     int offset; /* Offset from buf start. Aka. index into pool->nodes[]. */
-    int size;
+    int bytes;
 } strpool__view;
 
 
@@ -59,7 +54,7 @@ typedef struct strpool__view {
 
 typedef struct strpool__Node {
     int free_chunks;
-    int i_next_node; // Index to nodes[].
+    int i_next_node; // Index to next free node. (Index in nodes[]).
 } strpool__Node;
 
 
@@ -309,7 +304,7 @@ ID strpool_append(Strpool *p, STRPOOL_STR view) {
     // Write view.
     if (view.size > 0) { memcpy(writing_area, view.data, (size_t)view.size); }
     new_view->offset = i_node;
-    new_view->size = view.size;
+    new_view->bytes = view.size;
     return ID_make(view_id);
 }
 
@@ -325,7 +320,7 @@ int strpool_remove(Strpool *p, ID view_id) {
         strpool__view *view = strpool__view_Slot_get(&p->views, ID_get(view_id));
         if (!view) { return -1; }
         i_curr = view->offset;
-        view_chunks = strpool__div_ceil(view->size, STRPOOL__CHUNK);
+        view_chunks = strpool__div_ceil(view->bytes, STRPOOL__CHUNK);
     }
     int err = strpool__view_Slot_pop(&p->views, ID_get(view_id));
     (void)err; // @Note. Probably want to print a warning here.
@@ -336,7 +331,7 @@ int strpool_remove(Strpool *p, ID view_id) {
 
 
 inline STRPOOL_STR strpool_get_from_view(const Strpool *p, strpool__view view) {
-    return (STRPOOL_STR) { .data = (char *)((strpool__Node *)p->nodes + view.offset), .size = view.size, };
+    return (STRPOOL_STR) { .data = (char *)((strpool__Node *)p->nodes + view.offset), .size = view.bytes, };
 }
 
 
