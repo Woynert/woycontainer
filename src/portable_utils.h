@@ -159,6 +159,7 @@ int python_modulo(int n, int M) { return ((n % M) + M) % M; }
 
 #define countof(a)         (sizeof(a) / sizeof(*(a)))
 #define countofi(a)  ((int)(sizeof(a) / sizeof(*(a))))
+#define sizeofi(a)  ((int)sizeof(a))
 //#define sizeof(x)    (ptrdiff_t)sizeof(x)
 //#define lengthof(s)  (countof(s) - 1)
 
@@ -267,5 +268,25 @@ void print_hex(const void *data, size_t len) {
     for (size_t i = 0; i < len; i++) { printf("%02X ", ((unsigned char*)data)[i]); }
     printf("\n");
 }
+
+// https://stackoverflow.com/a/72983424
+#define is_same_type(a, b)     __builtin_types_compatible_p(typeof(a), typeof(b))
+#define is_pointer_or_array(p) (__builtin_classify_type(p) == 5)
+#define decay(p)               (&*__builtin_choose_expr(is_pointer_or_array(p), p, NULL))
+#define is_pointer(p)          is_same_type(p, decay(p))
+#define STATIC_ASSERT_EXPR(cond, m) (0 * sizeof(char[(cond) ? 1 : -1]))
+
+typedef struct {
+    void *data;
+    int size;
+} Blob;
+
+#define make_blob(item) (Blob) {                                                      \
+    .data=&(item),                                                                    \
+    .size=(int)sizeof(item)                                                           \
+    + STATIC_ASSERT_EXPR(!is_pointer(item), "Sure you wanna pass a literal pointer?") \
+}
+
+#define blob_arg(blob) make_blob(blob).data,make_blob(blob).size
 
 #endif

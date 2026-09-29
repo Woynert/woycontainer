@@ -90,6 +90,9 @@ if not meson.is_subproject()
   slotpool_test = executable('slotpool_test', './src/slotpool_test.c')
   test('slotpool_test', slotpool_test)
 
+  mapstrobj_test = executable('mapstrobj_test', './src/mapstrobj_test.c')
+  test('mapstrobj_test', mapstrobj_test)
+
   # FUZZY TESTS
 
   strpool_test_fuzzy = executable('strpool_test_fuzzy', './src/strpool_test.c',

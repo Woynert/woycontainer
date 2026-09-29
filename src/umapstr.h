@@ -108,6 +108,7 @@ static inline pri(Umap__Bucket) *pri(hash_and_get_bucket)(const Strumap *m, strv
 }
 
 
+/// @Returns error.
 int pub(upsert)(Strumap *m, strview_t key_str, UMAPSTR__TYPE value) {
     // Note: Rehash at beginning so we can calculate the bucket hash only once...
     //

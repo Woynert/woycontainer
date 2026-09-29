@@ -71,7 +71,7 @@ typedef struct Slotpool {
 int          slotpool_create(Slotpool *p);
 int          slotpool_create_with_allocator(Slotpool *p, SLOTPOOL__ALLOC_PROTOTYPE(*allocator), void *allocator_user_data);
 void         slotpool_destroy(Slotpool *p);
-ID           slotpool__append(Slotpool *p, const char *data, const int size, void** out_item);
+ID           slotpool__append(Slotpool *p, const void *data, const int size, void** out_item);
 void*        slotpool__get(const Slotpool *p, ID view_id, int expected_size);
 void*        slotpool__get_from_view(const Slotpool *p, slotpool__view view);
 int          slotpool_remove(Slotpool *p, ID view_id);
@@ -247,7 +247,7 @@ ID slotpool__find_space(const Slotpool *p, int space, ID *out_i_prev_node) {
 /// @Param      data.     Optional.
 /// @Param[out] out_item. Optional.
 /// @Returns id; On error returns INVALID ID. (Check with ID_valid).
-ID slotpool__append(Slotpool *p, const char *data, const int size, void** out_item) {
+ID slotpool__append(Slotpool *p, const void *data, const int size, void** out_item) {
     if (size <= 0) { return ID_INVALID; }
     ID i_node_prev = ID_INVALID;
     ID i_node = ID_INVALID;
@@ -274,7 +274,7 @@ ID slotpool__append(Slotpool *p, const char *data, const int size, void** out_it
     // Calculate chunks.
 
     slotpool__Node *node = &p->nodes[ID_get(i_node)];
-    char *writing_area = (char *)node;
+    void *writing_area = (void *)node;
 
     int consumed_chunks = slotpool__div_ceil(size, STRPOOL__CHUNK);
     int remaining_chunks = node->free_chunks - consumed_chunks;
@@ -322,7 +322,7 @@ int slotpool_remove(Slotpool *p, ID view_id) {
 
 
 inline void* slotpool__get_from_view(const Slotpool *p, slotpool__view view) {
-    return (char *)((slotpool__Node *)p->nodes + ID_get(view.offset));
+    return (slotpool__Node *)p->nodes + ID_get(view.offset);
 }
 
 
@@ -334,8 +334,8 @@ void* slotpool__get(const Slotpool *p, ID view_id, int expected_size) {
 }
 
 #define slotpool_get(pool, TYPE, id) ((TYPE*)slotpool__get((pool), (id), (int)sizeof(TYPE)))
-#define slotpool_append(pool, TYPE, item) (slotpool__append((pool), (char*)(&(item)), (int)sizeof(TYPE), NULL))
-#define slotpool_append_get(pool, TYPE, item, out) (slotpool__append((pool), (char*)(&(item)), (int)sizeof(TYPE), (void**)(&out)))
+#define slotpool_append(pool, TYPE, item) (slotpool__append((pool), &(item), (int)sizeof(TYPE), NULL))
+#define slotpool_append_get(pool, TYPE, item, out) (slotpool__append((pool), &(item), (int)sizeof(TYPE), (void**)(&out)))
 
 
 size_t slotpool_report_memory(const Slotpool *p) {
