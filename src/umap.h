@@ -180,7 +180,7 @@ void pub(clear)(UMap *m) {
 
 #ifndef UMAP__UTILS
 #define UMAP__UTILS
-inline uint64_t umap__hash(char *data, int size) {
+static inline uint64_t umap__hash(char *data, int size) {
     // https://nullprogram.com/blog/2025/01/19/
     uint64_t h = 0x100;
     for (ptrdiff_t i = 0; i < size; i++) {
@@ -189,8 +189,8 @@ inline uint64_t umap__hash(char *data, int size) {
     }
     return h;
 }
-bool umap__default_equal(KEY a, KEY b, void *data) { (void)data; return 0 == memcmp(&a, &b, sizeof(a)); }
-uint64_t umap__default_hash(KEY k, void *data) { (void)data; return umap__hash((char*)&k, sizeof(k)); }
+static bool umap__default_equal(KEY a, KEY b, void *data) { (void)data; return 0 == memcmp(&a, &b, sizeof(a)); }
+static uint64_t umap__default_hash(KEY k, void *data) { (void)data; return umap__hash((char*)&k, sizeof(k)); }
 #endif
 
 

@@ -2,7 +2,7 @@
     Type safe insert only list.
 
     * Pro: Arena friendly.
-    * Con: Cannot remove items.
+    * Con: Removing items from middle is expensive. Removing tail is fast.
 */
 
 #include <limits.h>
