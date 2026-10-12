@@ -24,7 +24,7 @@ void map_print(name2age_map *m) {
         for (int k = 0; k < bucket->pairs.size; ++k) {
             name2age_map__Pair *pair = &bucket->pairs.items[k];
             strview_t key = strpool_get(&m->strpool, pair->key);
-            printf("(\"%"PRIstr"\") = (%d)\n", PRIstrarg(key), pair->value.years);
+            printf("(\""PRIstrw"\") = (%d)\n", PRIstrarg(key), pair->value.years);
             ++count;
         }
     }
@@ -174,7 +174,7 @@ void map_fruit_print(Map *m) {
     int count = 0;
     Map_Fruit_It it = { 0 };
     while (Map_Fruit_it_next(m, &it)) {
-        printf("(\"%"PRIstr"\") = (%s)\n", PRIstrarg(it.key), it.value->name);
+        printf("(\""PRIstrw"\") = (%s)\n", PRIstrarg(it.key), it.value->name);
         ++count;
     }
     printf("Pair count == %d. Printed %d pairs.\n", m->pair_count, count);
@@ -388,9 +388,9 @@ TEST test_general(void) {
 
         err = Map_Fruit_remove(m, it.key);
         if (err != 0) {
-            printfd(ANSI_RED"Failed to remove: %"PRIstr" = %s", PRIstrarg(it.key), it.value->name);
+            printfd(ANSI_RED"Failed to remove: "PRIstrw" = %s", PRIstrarg(it.key), it.value->name);
         } else {
-            printfd(ANSI_GRE"Removed: %"PRIstr" = %s", PRIstrarg(it.key), it.value->name);
+            printfd(ANSI_GRE"Removed: "PRIstrw" = %s", PRIstrarg(it.key), it.value->name);
         }
         ASSERT_INT(err, 0);
     }

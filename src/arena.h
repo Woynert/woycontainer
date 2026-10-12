@@ -6,10 +6,10 @@
 #include "stdint.h"
 #include "string.h"
 #include "stdlib.h"
-#include "portable_utils.h"
-#include <limits.h>
+#include "stdbool.h"
+#include "limits.h"
 
-
+typedef int64_t i64;
 
 typedef struct ArenaRoot {
     char *buf;
@@ -53,9 +53,8 @@ void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
     ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
     ptrdiff_t available = a->end - a->beg - padding;
     if (available <= 0 || count > available / size) {
-        printfd("OUT OF MEMORY.");
-        //return NULL;
-        wassert(false); // OOM.
+        printf("OUT OF MEMORY.\n");
+        abort();
     }
     void *p = a->beg + padding;
     a->beg += padding + count * size;
@@ -74,8 +73,6 @@ bool arena__can_fit(Arena *a, i64 size, i64 align, i64 count) {
 }
 #define arena_can_fit(arena, T, count)\
     arena__can_fit(arena, sizeof(T), _Alignof(T), count)
-/*
-*/
 
 
 static void* arena_allocator(void* ptr, size_t size, int align, void* user_data) {

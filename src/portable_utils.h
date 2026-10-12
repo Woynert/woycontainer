@@ -289,4 +289,14 @@ typedef struct {
 
 #define blob_arg(blob) make_blob(blob).data,make_blob(blob).size
 
+#define array_invert(TYPE, items, size) do {     \
+    const int size_half = (size)/2;              \
+    for (int i = 0; i < size_half; ++i) {        \
+        int k = (size) -i -1;                    \
+        TYPE bk = (items)[i];                    \
+        (items)[i] = (items)[k];                 \
+        (items)[k] = bk;                         \
+    }                                            \
+} while (0);
+
 #endif

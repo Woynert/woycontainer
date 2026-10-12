@@ -8,8 +8,6 @@
  * #define WRING__TYPE <type>
  * #define WRING__NAMESPACE <custom name> (optional)
  * #include "wring.h"
- * #undef  WRING__TYPE
- * #undef  WRING__NAMESPACE
  *
  * Example:
  *
@@ -42,7 +40,7 @@ typedef struct {
     TYPE *buffer;
 } WRing;
 
-static WRing  PRE(create)            (uint capacity);
+static int    PRE(create) (WRing *ring, uint capacity);
 static void   PRE(free)              (WRing *ring);
 static int    PRE(push_head)         (WRing *ring, TYPE item);
 static int    PRE(extend_head)       (WRing *ring);
@@ -64,11 +62,14 @@ static bool   PRE(has_item)          (WRing *ring, TYPE item);
  * static void PRE(sort)
  */
 
-static WRing PRE(create) (uint capacity) {
-    WRing ring = { 0 };
-    ring._capacity = capacity;
-    ring.buffer = (TYPE*)calloc(ring._capacity, sizeof(TYPE));
-    return ring;
+/// @Returns Error.
+static int PRE(create) (WRing *ring, uint capacity) {
+    *ring = (WRing) { 0 };
+    TYPE *new_buffer = (TYPE*)calloc(capacity, sizeof(TYPE));
+    if (!new_buffer) { return -1; }
+    ring->_capacity = capacity;
+    ring->buffer = new_buffer;
+    return 0;
 }
 
 static void PRE(free) (WRing *ring) {
@@ -120,6 +121,7 @@ static int PRE(extend_head) (WRing *ring) {
  * If already full will pop tail to make space, otherwise same as extend_head.
  */
 static void PRE(extend_head_force) (WRing *ring) {
+    if (ring->_capacity <= 0) { return; }
 	while (ring->size >= ring->_capacity) {
 		PRE(pop_tail)(ring);
     }
@@ -248,6 +250,6 @@ static bool PRE(has_item) (WRing *ring, TYPE item) {
 
 #undef PRE
 #undef TYPE
-//#undef WRING_TYPE
-//#undef WRING_PREFIX
-//#undef WRING_ENABLE_COMPARISONS
+#undef WRING__TYPE
+#undef WRING__NAMESPACE
+#undef WRING_ENABLE_COMPARISONS

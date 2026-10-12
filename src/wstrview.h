@@ -13,9 +13,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#ifndef PRIstr
-#define PRIstr ".*s"
-#endif
 #define PRIstrw "%.*s"
 #ifndef PRIstrarg
 #define PRIstrarg(arg) ((arg).size),((arg).data)

@@ -132,7 +132,7 @@ static int pfx(resize) (Dyna *da, int new_capacity) {
     if (new_capacity < 0) { return -1; }
     if (da->capacity == new_capacity) { return 0; }
 
-    DYNA__ALLOC_PROTOTYPE(*allocator) = da->allocator != NULL ? da->allocator : pfx(_default_allocator);
+    DYNA__ALLOC_PROTOTYPE(*allocator) = da->allocator ? da->allocator : pfx(_default_allocator);
     TYPE *new_ptr = NULL;
     size_t bytes = sizeof(TYPE) * (size_t)new_capacity;
 
@@ -416,22 +416,14 @@ static int pfx(_round_up_capacity) (int capacity) {
 
 
 static DYNA__ALLOC_PROTOTYPE(pfx(_default_allocator)) {
-    (void)align; (void)user_data; // Unused: malloc guarantees alignment.
-
     // New allocation: ptr == NULL && size > 0
     // Reallocation:   ptr != NULL && size > 0
     // Free:           ptr != NULL && size == 0
-
+    (void)align; (void)user_data; // Unused: malloc guarantees alignment.
     void* result = NULL;
-    if (size == 0) {
-        free(ptr);
-    } else {
-        if (ptr == NULL) {
-            result = malloc(size);
-        } else {
-            result = realloc(ptr, size);
-        }
-    }
+    if      (size == 0)   { free(ptr);                   }
+    else if (ptr == NULL) { result = malloc(size);       }
+    else                  { result = realloc(ptr, size); }
     return result;
 }
 

@@ -151,7 +151,7 @@ void strpool_print_debug(Strpool *p) {
     for (int i = 0; i < p->views.count; ++i) {
         ID userid = IDmake(p->views.itemid_to_userid[i]);
         strview_t mystr = strpool_get(p, userid);
-        printf("userid %d itemid %d item (offset %d size %d (%d chunks)) {%"PRIstr"}\n",
+        printf("userid %d itemid %d item (offset %d size %d (%d chunks)) {"PRIstrw"}\n",
                 IDget(userid), i, p->views._items[i].offset, p->views._items[i].bytes, strpool__div_ceil(p->views._items[i].bytes, STRPOOL__CHUNK), PRIstrarg(mystr));
     }
     printf("\n");
@@ -175,7 +175,7 @@ TEST test_general(void) {
     ASSERT_INT_GTE(ID_get(view_id), 0);
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
+    printfd("id %d Got ["PRIstrw"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     ID str_id_empty1 = view_id;
 
@@ -183,7 +183,7 @@ TEST test_general(void) {
     ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
+    printfd("id %d Got ["PRIstrw"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     ID str_id_hello = view_id;
 
@@ -191,7 +191,7 @@ TEST test_general(void) {
     ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
+    printfd("id %d Got ["PRIstrw"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     ID str_id_empty2 = view_id;
 
@@ -199,7 +199,7 @@ TEST test_general(void) {
     ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
+    printfd("id %d Got ["PRIstrw"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     ID str_id_numbers = view_id;
 
@@ -208,7 +208,7 @@ TEST test_general(void) {
     ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
+    printfd("id %d Got ["PRIstrw"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     ID str_id_longtext = view_id;
 
@@ -217,7 +217,7 @@ TEST test_general(void) {
     ASSERT(view_id != -1);
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(*result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(*result));
+    printfd("id %d Got [%"PRIstrw"]", view_id, PRIstrarg(*result));
     strpool_print_debug(&pool);
     */
 
@@ -226,7 +226,7 @@ TEST test_general(void) {
     ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
+    printfd("id %d Got ["PRIstrw"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     ID str_id_crazy = view_id;
 
@@ -235,7 +235,7 @@ TEST test_general(void) {
     ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
+    printfd("id %d Got ["PRIstrw"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     ID str_id_locked = view_id;
 
@@ -255,34 +255,34 @@ TEST test_general(void) {
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstrw"]", view_id, PRIstrarg(result));
 
     view_id = strpool_append(&strpool, cstr_SL("Hello"));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstrw"]", view_id, PRIstrarg(result));
     int str_id_hello = view_id;
 
     view_id = strpool_append(&strpool, cstr_SL(""));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstrw"]", view_id, PRIstrarg(result));
     int str_id_empty = view_id;
 
     view_id = strpool_append(&strpool, cstr_SL("This is me"));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstrw"]", view_id, PRIstrarg(result));
     int str_id_thisme = view_id;
 
     view_id = strpool_append(&strpool, cstr_SL("lkdafjdls;jfdaljdofvjdsofjal dkjflajd lfjladsjvfoajadasofjcvodasjfcojdaofjdaos fajodisfj aopdsuf9p8uf93q4u9cfjidjlfjadljfdsjf98aua4ajf4lkj2fcljdsoafu48u2fodjalf;j84279158jfkjdaskfjd mjf9 0sudf90ja odjf kldasfj dlsjaf 98quf qoljf ldjfqp8eq9jf eljf aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "));
     ASSERT(view_id != -1);
     result = strpool_get(&strpool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", view_id, PRIstrarg(result));
+    printfd("id %d Got [%"PRIstrw"]", view_id, PRIstrarg(result));
     int str_id_longtext = view_id;
 
     strpool_print_debug(&strpool);
@@ -338,7 +338,7 @@ TEST test_general(void) {
     ASSERT(ID_valid(view_id));
     result = strpool_get(&pool, view_id);
     ASSERT(wstrview_is_valid(result));
-    printfd("id %d Got [%"PRIstr"]", IDget(view_id), PRIstrarg(result));
+    printfd("id %d Got ["PRIstrw"]", IDget(view_id), PRIstrarg(result));
     strpool_print_debug(&pool);
     str_id_hello = view_id;
 
