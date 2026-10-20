@@ -1,3 +1,13 @@
+// arena.h - v1.00 - public domain - Simple arena.
+// Woynert 2026
+//
+// Canonical home for this library:
+//     https://github.com/woynert/woycontainer
+//
+// Version history:
+//     0.01: (2026-10-17) Initial release.
+//
+
 #ifndef ARENA_H
 #define ARENA_H
 
@@ -23,7 +33,7 @@ typedef struct Arena {
 } Arena;
 
 
-ArenaRoot ArenaRoot_create(i64 cap) {
+static ArenaRoot ArenaRoot_create(i64 cap) {
     char *buf = (char *)malloc((size_t)cap);
     return (ArenaRoot) {
         .buf = buf,
@@ -32,19 +42,19 @@ ArenaRoot ArenaRoot_create(i64 cap) {
 }
 
 
-void ArenaRoot_free(ArenaRoot *r) {
+static void ArenaRoot_free(ArenaRoot *r) {
     if (r->buf == NULL) { return; }
     free(r->buf);
     *r = (ArenaRoot) { 0 };
 }
 
 
-Arena ArenaRoot_get_arena(ArenaRoot r) {
+static Arena ArenaRoot_get_arena(ArenaRoot r) {
     return (Arena) {.beg = r.buf, .end = r.buf ? r.buf + r.cap : NULL};
 }
 
 
-void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
+static void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
 {
     // Source https://nullprogram.com/blog/2023/09/27/
     // Question: Why the negative in the padding works?
@@ -66,7 +76,7 @@ void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
     (T *)arena_alloc(arena, sizeof(T), _Alignof(T), (count))
 
 
-bool arena__can_fit(Arena *a, i64 size, i64 align, i64 count) {
+static bool arena__can_fit(Arena *a, i64 size, i64 align, i64 count) {
     ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
     ptrdiff_t available = a->end - a->beg - padding;
     return !(available <= 0 || count > available / size);
@@ -88,7 +98,6 @@ static void* arena_allocator(void* ptr, size_t size, int align, void* user_data)
     }
     return result;
 }
-
 
 
 #endif // !ARENA_H

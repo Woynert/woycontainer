@@ -1,11 +1,17 @@
-## Run coverage for fuzz test.
+## Run tests and coverage (gcc)
 
-```
-make mesonSetupDebugClang
-make compile
-./build/wmap_test_fuzzy -runs=1000
+```sh
+cd test
+make test
 make coverage
-make coverageClean # <- To start from fresh state.
+```
+
+## Run fuzzy tests and coverage (clang)
+
+```sh
+cd test
+make fuzzteest
+make coverageClang
 ```
 
 ## Tests
