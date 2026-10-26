@@ -10,7 +10,8 @@ test:
 	premake5 ninja --cc=$(CC) && ninja -C build && premake5 test
 
 fuzztest:
-	premake5 ninja --cc=$(CC) && ninja -C build && premake5 fuzztest
+	premake5 ninja --cc=clang && ninja -C build && premake5 fuzztest
+	# Clang only.
 
 coverage:
 	mkdir -p ./build/coverage/

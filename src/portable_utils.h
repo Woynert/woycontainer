@@ -70,7 +70,7 @@ static inline int int_clamp(int min, int max, int value)                { return
 static inline int int_sign(int x) { return (x > 0) - (x < 0); } // Returns -1 or 1.
 static inline float float_sign(float x) { return (float)((x > 0.0) - (x < 0.0)); } // Returns -1 or 1.
 static inline float float_clamp(float min, float max, float value)      { return fmaxf(min, fminf(max, value)); }
-static inline bool int_in_range_inclusive(int min, int max, int value)  { return value >= min && value <= max; }
+static inline bool in_range_inclusive(int min, int max, int value)  { return value >= min && value <= max; }
 
 static int int_digit_places (int n) {
     if (n < 0) n = (n == INT_MIN) ? INT_MAX : -n;
