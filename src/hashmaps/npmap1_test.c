@@ -11,11 +11,11 @@ typedef struct {
 
 
 void print_pairs(const Map *m) {
-    printfd("\nMap pairs %d, max capacity %d", m->size, (1 << SIZE_EXP) -1);
-    printfd("Printing pairs:");
+    logline("\nMap pairs %d, max capacity %d", m->size, (1 << SIZE_EXP) -1);
+    logline("Printing pairs:");
     for (int i = 0; i < m->size; ++i) {
         const Node *node = &m->items[i];
-        printfd("%d = %s", node->key, node->value.name);
+        logline("%d = %s", node->key, node->value.name);
     }
 }
 

@@ -103,8 +103,8 @@ static inline void pfx(_pair_populate) (pfx(Pair) *pair, const KEY key, const in
 
 #ifdef MAP__DEBUG
 #define MAP__PRINT(...) \
-    do { printf("\033[33m"); printf(__VA_ARGS__); \
-    printf("\033[0m" " %s:%s:%d\n", __func__, __FILE__, __LINE__); } while (0)
+    do { fprintf(stderr, "\033[33m"); fprintf(stderr, __VA_ARGS__); \
+    fprintf(stderr, "\033[0m" " %s:%s:%d\n", __func__, __FILE__, __LINE__); } while (0)
 #else
 #define MAP__PRINT(...) do { } while(0)
 #endif
@@ -113,8 +113,8 @@ static inline void pfx(_pair_populate) (pfx(Pair) *pair, const KEY key, const in
 #ifdef MAP__ENABLE_ASSERT
 #define MAP__ASSERT(value) \
     do { if (!!(value) != true) { \
-    printf("\nFAILED ASSERT %s|%s:%d\n", __func__, __FILE__, __LINE__); \
-    printf(#value); printf("\n"); __asm__("int3"); exit(1); } } while (0)
+    fprintf(stderr, "\nFAILED ASSERT %s|%s:%d\n", __func__, __FILE__, __LINE__); \
+    fprintf(stderr, #value); fprintf(stderr, "\n"); __asm__("int3"); exit(1); } } while (0)
 #else
 #define MAP__ASSERT(x)
 #endif
@@ -450,29 +450,29 @@ int pfx(_set_pair) (Map *m, const KEY key, const int value_id, const bool can_re
 
 
 void pfx(print_bitmap) (Map *m) {
-    printf("MAP size %d, cols %d, rows %d\n", m->pairs.size, m->cols, m->rows);
+    fprintf(stderr, "MAP size %d, cols %d, rows %d\n", m->pairs.size, m->cols, m->rows);
 
     pfx(Pair) *pair = NULL;
     TYPE *value = NULL;
 
     for (int row = 0; row < m->rows; ++row) {
-        printf("[");
+        fprintf(stderr, "[");
         for (int col = 0; col < m->cols; ++col) {
 
             pair = &m->pairs.items[col + row * m->cols];
             value = NULL;
 
             if (pair->value_id == -1) {
-                printf("xx,xx|");
+                fprintf(stderr, "xx,xx|");
             } else {
                 value = pfx(Pool_get)(&m->pool, pair->value_id);
-                printf("%d,%d|", pair->key, *value);
+                fprintf(stderr, "%d,%d|", pair->key, *value);
             }
 
         }
-        printf("]\n");
+        fprintf(stderr, "]\n");
     }
-    printf("\n");
+    fprintf(stderr, "\n");
 }
 
 

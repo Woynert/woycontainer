@@ -115,7 +115,7 @@ pri(Node) **pri(lookup)(Map *m, strview_t key, int *out_idx, bool trying_to_inse
         }
         else { // Compare keys.
             strview_t stored_key = strpool_get(&m->strpool, node->key);
-            if (stored_key.data == NULL) { printfd("Error: Invalid key should never happen."); }
+            if (stored_key.data == NULL) { logline("Error: Invalid key should never happen."); }
             if (wstrview_equals(key, stored_key)) { // Found it.
                 if (out_idx != NULL) { *out_idx = i; }
                 return &m->hashmap[i];
@@ -229,7 +229,7 @@ void pri(rehash)(Map *old_m, Map *new_m) {
         if (pri(node_is_empty)(old_m, node)) { continue; }
 
         strview_t stored_key = strpool_get(&old_m->strpool, node->key);
-        if (stored_key.data == NULL) { printfd("ERR: Couldn't find stored key."); continue; }
+        if (stored_key.data == NULL) { logline("ERR: Couldn't find stored key."); continue; }
 
         // Insert.
 
@@ -241,7 +241,7 @@ void pri(rehash)(Map *old_m, Map *new_m) {
         ++new_m->count;
     }
 
-    printfd("DEBUG: Rehashed.");
+    logline("DEBUG: Rehashed.");
 }
 
 

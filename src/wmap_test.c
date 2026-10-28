@@ -81,41 +81,41 @@ int *both_maps_get(Map_Int *a, NaiveMap *b, int key, bool *out_equal) {
 bool both_maps_compare_order_and_contents(Map_Int *a, NaiveMap *b) {
     if (Map_Int_pair_count(a) != b->pairs.size
         || Map_Int_pair_count(a) != a->values.count
-    ) { printferr("Wrong pair count."); return false; }
+    ) { logerror("Wrong pair count."); return false; }
     // Forward.
     {
         int k = 0;
         Map_Int_It it = Map_Int_make_it(a);
-        /*printfd("it is %d (size %d)", ID_get(it.__id), b->pairs.size);*/
+        /*logline("it is %d (size %d)", ID_get(it.__id), b->pairs.size);*/
         while (Map_Int_it_next(a, &it)) {
-            if (!int_in_range_inclusive(0, b->pairs.size-1, k)) {
-                printferr("Worng pair count.."); return false;
+            if (!in_range_inclusive(0, b->pairs.size-1, k)) {
+                logerror("Worng pair count.."); return false;
             }
             if (it.key != b->pairs.items[k].key
                 || *it.value != b->pairs.items[k].value)
             {
-                printferr("Wrong key or value."); 
+                logerror("Wrong key or value."); 
                 return false;
             }
             ++k;
         }
-        if (k != b->pairs.size) { printferr("Coudn't find all pairs"); return false; }
+        if (k != b->pairs.size) { logerror("Coudn't find all pairs"); return false; }
     }
     // Backwards.
     {
         int k = b->pairs.size-1;
         Map_Int_It it = Map_Int_make_it_end(a);
         while (Map_Int_it_prev(a, &it)) {
-            if (!int_in_range_inclusive(0, b->pairs.size-1, k)) { printferr("Worng pair count.."); return false; }
+            if (!in_range_inclusive(0, b->pairs.size-1, k)) { logerror("Worng pair count.."); return false; }
             if (it.key != b->pairs.items[k].key
                 || *it.value != b->pairs.items[k].value)
             {
-                printferr("Wrong key or value."); 
+                logerror("Wrong key or value."); 
                 return false;
             }
             --k;
         }
-        if (k != -1) { printferr("Coudn't find all pairs"); return false; }
+        if (k != -1) { logerror("Coudn't find all pairs"); return false; }
     }
     return true;
 }
@@ -168,7 +168,7 @@ bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
     // Check buckets.
     {
         if (integrity.bucket_chains.size != m->bucket_count) {
-            printferr("Wrong amount of buckets."); return false;
+            logerror("Wrong amount of buckets."); return false;
         }
 
         for (int i = 0; i < m->bucket_count; ++i) {
@@ -186,7 +186,7 @@ bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
             if (Map_Int__Table_slot_is_empty(m, node)) {
                 if (keys.size == 0) { continue; }
                 else {
-                    printferr("Coudln't find any, expected %d (bucket %d).", keys.size, i);
+                    logerror("Coudln't find any, expected %d (bucket %d).", keys.size, i);
                     return false;
                 }
             }
@@ -200,13 +200,13 @@ bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
                             found = true; Vec_Int_remove_at(&keys, l); break;
                         }
                     }
-                    if (!found) { printferr("Failed to find key"); return false; }
+                    if (!found) { logerror("Failed to find key"); return false; }
                     node = m->bucket_next.items[ID_get(node)];
                     if (ID_valid(node)) { last_valid_node = node; }
                 }
                 if (keys.size != 0) {
-                    printferr("Couldn't find all.");
-                    for (int l = 0; l < keys.size; ++l) { printferr("Missing %d", keys.items[i]); }
+                    logerror("Couldn't find all.");
+                    for (int l = 0; l < keys.size; ++l) { logerror("Missing %d", keys.items[i]); }
                     return false;
                 }
             }
@@ -229,31 +229,31 @@ bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
                             found = true; Vec_Int_remove_at(&keys, l); break;
                         }
                     }
-                    if (!found) { printferr("Failed to find key"); return false; }
+                    if (!found) { logerror("Failed to find key"); return false; }
                     node = m->bucket_prev.items[ID_get(node)];
                 }
                 if (keys.size != 0) {
-                    printferr("Couldn't find all.");
-                    for (int l = 0; l < keys.size; ++l) { printferr("Missing %d", keys.items[i]); }
+                    logerror("Couldn't find all.");
+                    for (int l = 0; l < keys.size; ++l) { logerror("Missing %d", keys.items[i]); }
                     return false;
                 }
             }
         }
     }
-    if (integrity.ordered_keys.size != m->pair_count) { printferr("Wrong pair count."); return false; }
+    if (integrity.ordered_keys.size != m->pair_count) { logerror("Wrong pair count."); return false; }
     // Check order FORWARDS.
     {
         View_Int ordered_keys = integrity.ordered_keys;
         int i = 0;
         ID node = m->first_node;
         while(ID_valid(node)) {
-            if (i >= ordered_keys.size) { printferr("Wrong amount of keys."); return false; }
-            printfd("%d !=? %d", ordered_keys.items[i], m->keys.items[ID_get(node)]);
-            if (ordered_keys.items[i] != m->keys.items[ID_get(node)]) { printferr("Wrong order."); return false; }
+            if (i >= ordered_keys.size) { logerror("Wrong amount of keys."); return false; }
+            logline("%d !=? %d", ordered_keys.items[i], m->keys.items[ID_get(node)]);
+            if (ordered_keys.items[i] != m->keys.items[ID_get(node)]) { logerror("Wrong order."); return false; }
             node = m->next.items[ID_get(node)];
             ++i;
         }
-        if (i != ordered_keys.size) { printferr("Couldn't find all pairs."); return false; }
+        if (i != ordered_keys.size) { logerror("Couldn't find all pairs."); return false; }
     }
     // Check order BACKWARDS.
     {
@@ -261,13 +261,13 @@ bool check_integrity(Map_Int *w, IntegrityTest integrity, Arena scratch) {
         int i = ordered_keys.size-1;
         ID node = m->last_node;
         while(ID_valid(node)) {
-            if (i >= ordered_keys.size) { printferr("Wrong amount of keys."); return false; }
-            printfd("%d !=? %d", ordered_keys.items[i], m->keys.items[ID_get(node)]);
-            if (ordered_keys.items[i] != m->keys.items[ID_get(node)]) { printferr("Wrong order."); return false; }
+            if (i >= ordered_keys.size) { logerror("Wrong amount of keys."); return false; }
+            logline("%d !=? %d", ordered_keys.items[i], m->keys.items[ID_get(node)]);
+            if (ordered_keys.items[i] != m->keys.items[ID_get(node)]) { logerror("Wrong order."); return false; }
             node = m->prev.items[ID_get(node)];
             --i;
         }
-        if (i != -1) { printferr("Couldn't find all pairs."); return false; }
+        if (i != -1) { logerror("Couldn't find all pairs."); return false; }
     }
     return true;
 }
@@ -423,32 +423,32 @@ TEST test_manual(ALLOC_PROTOTYPE(*allocator), void *alloc_data) {
     int err;
 
     map_print(m);
-    printfd("---");
+    logline("---");
     err = Map_Int_upsert(m, 888, 80);
     map_print(m);
     ASSERT_INT(err, 0);
     ASSERT_INT(Map_Int_pair_count(m), 1);
-    printfd("---");
+    logline("---");
     err = Map_Int_upsert(m, 1, 10);
     map_print(m);
     ASSERT_INT(err, 0);
     ASSERT_INT(Map_Int_pair_count(m), 2);
-    printfd("---");
+    logline("---");
     err = Map_Int_upsert(m, 2, 20);
     map_print(m);
     ASSERT_INT(err, 0);
     ASSERT_INT(Map_Int_pair_count(m), 3);
-    printfd("---");
+    logline("---");
     err = Map_Int_upsert(m, 3, 30);
     map_print(m);
     ASSERT_INT(err, 0);
     ASSERT_INT(Map_Int_pair_count(m), 4);
-    printfd("---");
+    logline("---");
     err = Map_Int_upsert(m, 4, 40);
     map_print(m);
     ASSERT_INT(err, 0);
     ASSERT_INT(Map_Int_pair_count(m), 5);
-    printfd("---");
+    logline("---");
     err = Map_Int_upsert(m, 5, 50);
     ASSERT_INT(err, 0);
     ASSERT_INT(Map_Int_pair_count(m), 6);
@@ -458,21 +458,21 @@ TEST test_manual(ALLOC_PROTOTYPE(*allocator), void *alloc_data) {
 
     srand(0);
     if ((1)) {
-        printfd("↓↓↓");
+        logline("↓↓↓");
         map_print(m);
         map_print_bucket_chains(m);
         map_print_order(m, true);
-        printfd("---");
+        logline("---");
         for (int i = 0; i < 100; ++i) {
             int a = rand_range(m->table.bucket_count, (m->table.bucket_count) + m->table.collision_count-1);
             int b = rand_range(m->table.bucket_count, (m->table.bucket_count) + m->table.collision_count-1);
             Map_Int__Table__swap_nodes_diff_bucket(&m->table, ID_make(a), ID_make(b));
         }
-        printfd("---");
+        logline("---");
         map_print(m);
         map_print_bucket_chains(m);
         map_print_order(m, true);
-        printfd("↑↑↑");
+        logline("↑↑↑");
     }
 
     if ((1)) {
@@ -494,31 +494,31 @@ TEST test_manual(ALLOC_PROTOTYPE(*allocator), void *alloc_data) {
 
     int key;
     key = 888;
-    printfd("Removing %d", key);
+    logline("Removing %d", key);
     Map_Int_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
     key = 3;
-    printfd("Removing %d", key);
+    logline("Removing %d", key);
     Map_Int_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
     key = 4;
-    printfd("Removing %d", key);
+    logline("Removing %d", key);
     Map_Int_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
     key = 5;
-    printfd("Removing %d", key);
+    logline("Removing %d", key);
     Map_Int_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
     map_print_order(m, false);
     key = 1;
-    printfd("Removing %d", key);
+    logline("Removing %d", key);
     Map_Int_remove(m, key);
     map_print(m);
     map_print_bucket_chains(m);
@@ -600,8 +600,8 @@ TEST test_auto(ALLOC_PROTOTYPE(*allocator), void *alloc_data) {
         int i = 0; Map_Int_It it = Map_Int_make_it(m);
         while(Map_Int_it_next(m, &it)) {
             int key = nm->pairs.items[i].key;
-            printfd("%d. [%d]=>%d", i, key, nm->pairs.items[i].value);
-            printfd("%d. [%d]=>%d", i, key, *Map_Int_get(m, key));
+            logline("%d. [%d]=>%d", i, key, nm->pairs.items[i].value);
+            logline("%d. [%d]=>%d", i, key, *Map_Int_get(m, key));
             ASSERT_INT(nm->pairs.items[i].value, *Map_Int_get(m, key));
             ++i;
         }
@@ -619,8 +619,8 @@ TEST test_auto(ALLOC_PROTOTYPE(*allocator), void *alloc_data) {
         int i = 0; Map_Int_It it = Map_Int_make_it(m);
         while(Map_Int_it_next(m, &it)) {
             int key = nm->pairs.items[i].key;
-            printfd("%d. [%d]=>%d", i, key, nm->pairs.items[i].value);
-            printfd("%d. [%d]=>%d", i, key, *Map_Int_get(m, key));
+            logline("%d. [%d]=>%d", i, key, nm->pairs.items[i].value);
+            logline("%d. [%d]=>%d", i, key, *Map_Int_get(m, key));
             ASSERT_INT(nm->pairs.items[i].value, *Map_Int_get(m, key));
             ++i;
         }
@@ -631,7 +631,7 @@ TEST test_auto(ALLOC_PROTOTYPE(*allocator), void *alloc_data) {
         // Insert one pair.
         int key = rand_range(INT_MIN, INT_MAX);
         int value = key / 10;
-        printfd("Inserting %d:%d", key, value);
+        logline("Inserting %d:%d", key, value);
         err = both_maps_upsert(m, nm, key, value);
         ASSERT(!err);
         map_print(m);

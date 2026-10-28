@@ -288,15 +288,15 @@ static bool pfx(get_next) (const TreeSi *tree, pfx(Iterator) *it) {
 
 
 void pfx(print)(const TreeSi *tree) {
-    printf("------\n");
+    fprintf(stderr, "------\n");
     if (tree->nodes.size == 0) {
-        printf("[EMPTY TREE]\n");
+        fprintf(stderr, "[EMPTY TREE]\n");
         return;
     }
     for (int i = 0; i < tree->nodes.size; ++i) {
         pfx(Node) *node = &tree->nodes.items[i];
-        for (int k = 0; k < node->depth * 4; ++k) { printf(" "); }
-        printf("- %d\n", node->id);
+        for (int k = 0; k < node->depth * 4; ++k) { fprintf(stderr, " "); }
+        fprintf(stderr, "- %d\n", node->id);
     }
 }
 

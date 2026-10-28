@@ -63,7 +63,7 @@ static void *arena_alloc(Arena *a, i64 size, i64 align, i64 count)
     ptrdiff_t padding = (ptrdiff_t)( -(uintptr_t)a->beg & (uintptr_t)(align - 1) );
     ptrdiff_t available = a->end - a->beg - padding;
     if (available <= 0 || count > available / size) {
-        printf("OUT OF MEMORY.\n");
+        fprintf(stderr, "OUT OF MEMORY.\n");
         abort();
     }
     void *p = a->beg + padding;

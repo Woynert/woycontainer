@@ -42,7 +42,7 @@ void *allocator_user_data = NULL;
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
-    printfd(COLOR"insertion: %f secs.", (double)(get_system_ms() - start)/(double)1000);    \
+    logline(COLOR"insertion: %f secs.", (double)(get_system_ms() - start)/(double)1000);    \
                                                                                             \
     ASSERT_INT(map_count, 1 << EXP);                                                        \
                                                                                             \
@@ -58,7 +58,7 @@ void *allocator_user_data = NULL;
             ASSERT(wstrview_equals(wcstr(fruit.name), wcstr(result->name)));                \
         }                                                                                   \
     }                                                                                       \
-    printfd(COLOR"lookup: %f secs.", (double)(get_system_ms() - start)/(double)1000);       \
+    logline(COLOR"lookup: %f secs.", (double)(get_system_ms() - start)/(double)1000);       \
                                                                                             \
     start = get_system_ms();                                                                \
     {                                                                                       \
@@ -71,7 +71,7 @@ void *allocator_user_data = NULL;
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
-    printfd(COLOR"deletion: %f secs.", (double)(get_system_ms() - start)/(double)1000);     \
+    logline(COLOR"deletion: %f secs.", (double)(get_system_ms() - start)/(double)1000);     \
                                                                                             \
     ASSERT_INT(map_count, 0);                                                               \
                                                                                             \
@@ -86,12 +86,12 @@ void *allocator_user_data = NULL;
             ASSERT_INT(err, 0);                                                             \
         }                                                                                   \
     }                                                                                       \
-    printfd(COLOR"re-insertion: %f secs.", (double)(get_system_ms() - start)/(double)1000); \
+    logline(COLOR"re-insertion: %f secs.", (double)(get_system_ms() - start)/(double)1000); \
 
 
 
 TEST mapA_bechmark(void) {
-    printfd("MAP A BENCHMARK");
+    logline("MAP A BENCHMARK");
     int err;
     long start;
     MapA map = { 0 };
@@ -101,10 +101,10 @@ TEST mapA_bechmark(void) {
     TEST_TEMPLATE(map, MapA_upsert, MapA_get, MapA_remove, map.count, ANSI_GRE);
     {
         size_t total_memory = MapA_report_memory(&map);
-        printfd("REPORTED TOTAL MEMORY "PRIbyte, PRIbytearg(total_memory));
+        logline("REPORTED TOTAL MEMORY "PRIbyte, PRIbytearg(total_memory));
         size_t strpool_memory = strpool_report_memory(&map.strpool);
-        printfd("STRPOOL MEMORY "PRIbyte, PRIbytearg(strpool_memory));
-        printfd("MAP MEMORY "PRIbyte, PRIbytearg(total_memory - strpool_memory));
+        logline("STRPOOL MEMORY "PRIbyte, PRIbytearg(strpool_memory));
+        logline("MAP MEMORY "PRIbyte, PRIbytearg(total_memory - strpool_memory));
     }
     MapA_free(&map);
 
@@ -113,7 +113,7 @@ TEST mapA_bechmark(void) {
 
 
 TEST mapB_bechmark(void) {
-    printfd("MAP B BENCHMARK");
+    logline("MAP B BENCHMARK");
     int err;
     long start;
     MapB map = { 0 };
@@ -123,10 +123,10 @@ TEST mapB_bechmark(void) {
     TEST_TEMPLATE(map, MapB_upsert, MapB_get, MapB_remove, map.pair_count, ANSI_BLU);
     {
         size_t total_memory = MapB_report_memory(&map);
-        printfd("REPORTED TOTAL MEMORY "PRIbyte, PRIbytearg(total_memory));
+        logline("REPORTED TOTAL MEMORY "PRIbyte, PRIbytearg(total_memory));
         size_t strpool_memory = strpool_report_memory(&map.strpool);
-        printfd("STRPOOL MEMORY "PRIbyte, PRIbytearg(strpool_memory));
-        printfd("MAP MEMORY "PRIbyte, PRIbytearg(total_memory - strpool_memory));
+        logline("STRPOOL MEMORY "PRIbyte, PRIbytearg(strpool_memory));
+        logline("MAP MEMORY "PRIbyte, PRIbytearg(total_memory - strpool_memory));
     }
     MapB_free(&map);
 
@@ -152,7 +152,7 @@ int main(void) {
     RUN_TEST(mapA_bechmark); 
     {
         int consumed = (int)(arena.beg - root.buf);
-        printfd("Arena remaining memory "PRIbyte" out of "PRIbyte" (%.1f %%).", PRIbytearg(consumed), PRIbytearg(root.cap), ((float)consumed/(float)root.cap)*100.0);
+        logline("Arena remaining memory "PRIbyte" out of "PRIbyte" (%.1f %%).", PRIbytearg(consumed), PRIbytearg(root.cap), ((float)consumed/(float)root.cap)*100.0);
     }
 
     arena = ArenaRoot_get_arena(root);
@@ -161,13 +161,13 @@ int main(void) {
     RUN_TEST(mapB_bechmark); 
     {
         int consumed = (int)(arena.beg - root.buf);
-        printfd("Arena remaining memory "PRIbyte" out of "PRIbyte" (%.1f %%).", PRIbytearg(consumed), PRIbytearg(root.cap), ((float)consumed/(float)root.cap)*100.0);
+        logline("Arena remaining memory "PRIbyte" out of "PRIbyte" (%.1f %%).", PRIbytearg(consumed), PRIbytearg(root.cap), ((float)consumed/(float)root.cap)*100.0);
     }
 
     ArenaRoot_free(&root);
 
     {
-        printfd("Ideal size for %zu elements is "PRIbyte, (size_t)1<<EXP, PRIbytearg((1<<EXP) * sizeof(Fruit)));
+        logline("Ideal size for %zu elements is "PRIbyte, (size_t)1<<EXP, PRIbytearg((1<<EXP) * sizeof(Fruit)));
     }
 
     TESTS_SHOW_RESULTS();

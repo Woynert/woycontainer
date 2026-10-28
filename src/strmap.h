@@ -199,7 +199,7 @@ void pri(rehash_if_needed)(Strmap *old_m) {
 
     int err = pri(init)(new_m, old_m->allocator, old_m->allocator_userdata);
     if (err == -1) {
-        printfd("ERR: Couldn't rehash, no memory?");
+        logline("ERR: Couldn't rehash, no memory?");
         return;
     }
 
@@ -245,11 +245,11 @@ void pri(rehash_if_needed)(Strmap *old_m) {
 
     if ((0)) {
         exit_abort:
-        printfd("ERR: Couldn't rehash, no memory?");
+        logline("ERR: Couldn't rehash, no memory?");
         pub(free)(new_m);
     }
 
-    printfd("DEBUG: Rehashed.");
+    logline("DEBUG: Rehashed.");
     return;
 }
 
@@ -344,8 +344,8 @@ static int pub(remove)(Strmap *m, strview_t key) {
             int err1 = strpool_remove(&m->strpool, str_internal_storage_key);
             int err2 = pri(Pair_da_remove_at)(&bucket->pairs, i);
 
-            if (err1 != 0) { printfd("ERROR(%d) strpool. Couldn't delete.", err1); }
-            if (err2 != 0) { printfd("ERROR(%d) pair_da. Couldn't delete.", err2); }
+            if (err1 != 0) { logline("ERROR(%d) strpool. Couldn't delete.", err1); }
+            if (err2 != 0) { logline("ERROR(%d) pair_da. Couldn't delete.", err2); }
 
             --m->pair_count;
             return 0;

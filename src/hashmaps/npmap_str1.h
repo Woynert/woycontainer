@@ -100,7 +100,7 @@ Node **lookup(Map *m, strpool__str key, int *out_idx) {
             // Get string from strpol
             strpool__str stored_key = strpool_get(&m->strpool, node->key);
             if (stored_key.data == NULL) {
-                printfd("error: Should never happen.");
+                logline("error: Should never happen.");
             }
             if (str_equals(key, stored_key)) { // Found it.
                 if (out_idx != NULL) { *out_idx = i; }
@@ -133,7 +133,7 @@ int upsert(Map *m, strpool__str key, MAP__TYPE value) {
         // Try again.
         //node_slot = lookup(m, key, &new_node_idx);
         //if (node_slot == NULL) {
-            printfd(ANSI_RED"A");
+            logline(ANSI_RED"A");
             return -1;
         //}
     }
@@ -143,7 +143,7 @@ int upsert(Map *m, strpool__str key, MAP__TYPE value) {
 
         int idx = strpool_append(&m->strpool, key);
         if (idx == -1) {
-            printfd(ANSI_RED"B");
+            logline(ANSI_RED"B");
             return -1;
         }
 
@@ -157,7 +157,7 @@ int upsert(Map *m, strpool__str key, MAP__TYPE value) {
         new_node = *node_slot;
     }
 
-    //printfd("Set it here mate! SUCESSS item_id (%d)", (int)((ptrdiff_t)(new_node - m->items)));
+    //logline("Set it here mate! SUCESSS item_id (%d)", (int)((ptrdiff_t)(new_node - m->items)));
     new_node->value = value;
     return 0;
 }
@@ -231,7 +231,7 @@ void rehash(Map *old_m, Map *new_m) {
         if (node == NULL) { continue; }
 
         strpool__str stored_key = strpool_get(&old_m->strpool, node->key);
-        if (stored_key.data == NULL) { printfd("ERR: Couldn't find stored key."); continue; }
+        if (stored_key.data == NULL) { logline("ERR: Couldn't find stored key."); continue; }
 
         // Insert.
 

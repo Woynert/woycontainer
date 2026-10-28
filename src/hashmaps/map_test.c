@@ -61,7 +61,7 @@ void test2(void) {
     value = MyMap_get(&map, key);
     ASSERT(value);
     ASSERT(*value == og_value);
-    printfd("Got this value mate %d", *value);
+    logline("Got this value mate %d", *value);
     MyMap_print_bitmap(&map);
 
     key = INT_MAX;
@@ -71,7 +71,7 @@ void test2(void) {
     value = MyMap_get(&map, key);
     ASSERT(value);
     ASSERT(*value == og_value);
-    printfd("Got this value mate %d", *value);
+    logline("Got this value mate %d", *value);
     MyMap_print_bitmap(&map);
 
     key = INT_MAX;
@@ -81,7 +81,7 @@ void test2(void) {
     value = MyMap_get(&map, key);
     ASSERT(value);
     ASSERT(*value == og_value);
-    printfd("Got this value mate %d", *value);
+    logline("Got this value mate %d", *value);
     MyMap_print_bitmap(&map);
 
     key = 8080;
@@ -91,13 +91,13 @@ void test2(void) {
     value = MyMap_get(&map, key);
     ASSERT(value);
     ASSERT(*value == og_value);
-    printfd("Got this value mate %d", *value);
+    logline("Got this value mate %d", *value);
     MyMap_print_bitmap(&map);
     ASSERT(map.pair_amount = 4);
 
     err = MyMap_pop(&map, key, &out_value);
     ASSERT(err == 0);
-    printfd("Popped and got this value %d", *value);
+    logline("Popped and got this value %d", *value);
     ASSERT(out_value == og_value);
     ASSERT(map.pair_amount = 3);
 

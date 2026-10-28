@@ -30,20 +30,20 @@ typedef struct {
 
 
 void print_pairs(const Map *m) {
-    printfd("\nMap pairs %d, max capacity %d", m->count, (1 << m->size_exp) -1);
-    printfd("Printing pairs:");
+    logline("\nMap pairs %d, max capacity %d", m->count, (1 << m->size_exp) -1);
+    logline("Printing pairs:");
     for (int i = 0; i < (1 << m->size_exp); ++i) {
         pri(Node) * node = m->hashmap[i];
         if (pri(node_is_empty)(m, node)) { continue; }
         strview_t stored_key = strpool_get(&m->strpool, node->key);
-        printfd("(i %-4d)(strkey %-4d): %"PRIstr" = %s", i, node->key, PRIstrarg(stored_key), node->value.name);
+        logline("(i %-4d)(strkey %-4d): %"PRIstr" = %s", i, node->key, PRIstrarg(stored_key), node->value.name);
     }
 }
 
 
 bool items_are_equal(Fruit a, Fruit b) {
     bool res = wstrview_equals(wcstr(a.name), wcstr(b.name));
-    /*printfd("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
+    /*logline("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
     return res;
 }
 
@@ -84,13 +84,13 @@ bool should_find_these(const Map *m, MAP__TYPE *p_items, const int item_amount) 
     for (int k = 0; k < item_amount; ++k) {
         Item2Find *item = &items[k];
         if (!item->found) {
-            printfd("WAR: Didn't find item %d (%s)", k, item->item.name);
+            logline("WAR: Didn't find item %d (%s)", k, item->item.name);
             return false;
         }
     }
 
     if (item_amount != valid_items_found_count) {
-        printfd("WAR: Expected to find %d items but found %d", item_amount, valid_items_found_count);
+        logline("WAR: Expected to find %d items but found %d", item_amount, valid_items_found_count);
         return false;
     }
     return true; // success;
@@ -193,7 +193,7 @@ TEST test_general(void) {
     ASSERT_INT(err, 0);
     ASSERT_INT(m->count, 1);
     
-    printfd("\n---->>> Removed APPLE and Pear, should remain Banana.");
+    logline("\n---->>> Removed APPLE and Pear, should remain Banana.");
     print_pairs(m);
     {
         Fruit to_find[] = { makefruit("Banana") };
@@ -213,7 +213,7 @@ TEST test_general(void) {
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
-    printfd("\n---->>> Reinserting APPLE.");
+    logline("\n---->>> Reinserting APPLE.");
 
     key = cstr_SL("APPLE");
     fruit = (Fruit) { "Apple" };
@@ -260,9 +260,9 @@ TEST test_general(void) {
         strview_t stored_key = strpool_get(&m->strpool, node->key);
         err = pub(remove)(m, stored_key);
         if (err != 0) {
-            printfd(ANSI_RED"Failed to remove: %-4d: %"PRIstr" = %s", node->key, PRIstrarg(stored_key), node->value.name);
+            logline(ANSI_RED"Failed to remove: %-4d: %"PRIstr" = %s", node->key, PRIstrarg(stored_key), node->value.name);
         } else {
-            printfd(ANSI_GRE"Removed: %-4d: %"PRIstr" = %s", node->key, PRIstrarg(stored_key), node->value.name);
+            logline(ANSI_GRE"Removed: %-4d: %"PRIstr" = %s", node->key, PRIstrarg(stored_key), node->value.name);
         }
         ASSERT_INT(err, 0);
     }

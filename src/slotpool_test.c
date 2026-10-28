@@ -71,7 +71,7 @@ void naiveslotpool_remove(NaiveSlotpool *p, ID id) {
 #include "da.h"
 
 bool compare_contents(Slotpool *p, NaiveSlotpool *np, Arena scratch) {
-    if (p->views.count != np->data_store.count) { printferr("Wrong item count"); return false; }
+    if (p->views.count != np->data_store.count) { logerror("Wrong item count"); return false; }
 
     Vec_Data saved_data = Vec_Data_create_with_allocator(arena_allocator, &scratch);
     for (int i = 0; i < np->data_store.count; ++i) {
@@ -83,7 +83,7 @@ bool compare_contents(Slotpool *p, NaiveSlotpool *np, Arena scratch) {
         slotpool__view view = p->views._items[i];
         void *data1 = slotpool__get_from_view(p, view);
 
-        if (saved_data.size == 0) { printferr("Found too many."); return false; }
+        if (saved_data.size == 0) { logerror("Found too many."); return false; }
 
         for (dyna_foreach_gnu(iter, saved_data)) {
             void *data2 = iter.ref->data;
@@ -91,7 +91,7 @@ bool compare_contents(Slotpool *p, NaiveSlotpool *np, Arena scratch) {
                 0 == memcmp(data1, data2, (size_t)view.bytes)
             ) {
                 Vec_Data_remove_at(&saved_data, iter.index);
-                printfd("%d/%d Found item of size %d", i, p->views.count, view.bytes);
+                logline("%d/%d Found item of size %d", i, p->views.count, view.bytes);
                 print_hex(data1, (size_t)view.bytes);
                 print_hex(data2, (size_t)view.bytes);
                 break;
@@ -99,7 +99,7 @@ bool compare_contents(Slotpool *p, NaiveSlotpool *np, Arena scratch) {
         }
     }
 
-    if (saved_data.size != 0) { printferr("Couldn't find all."); return false; }
+    if (saved_data.size != 0) { logerror("Couldn't find all."); return false; }
 
     return true;
 }

@@ -188,16 +188,16 @@ int pfx(pop)(Slot *s, int user_id) {
 
 
 void pfx(print_debug)(const Slot *s) {
-    printf("\ncap %d count %d", s->capacity, s->count);
-    printf("\nuserid_to_itemid ");
+    fprintf(stderr,  "\ncap %d count %d", s->capacity, s->count);
+    fprintf(stderr,  "\nuserid_to_itemid ");
     for (int i = 0; i < s->capacity; ++i) {
-        printf("%04d ", s->userid_to_itemid[i]);
+        fprintf(stderr,  "%04d ", s->userid_to_itemid[i]);
     }
-    printf("\nitemid_to_userid ");
+    fprintf(stderr,  "\nitemid_to_userid ");
     for (int i = 0; i < s->capacity; ++i) {
-        printf("%04d ", s->itemid_to_userid[i]);
+        fprintf(stderr,  "%04d ", s->itemid_to_userid[i]);
     }
-    printf("\n");
+    fprintf(stderr,  "\n");
 }
 
 

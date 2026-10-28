@@ -83,10 +83,10 @@ static inline void pfx(_add_available_id) (POOL *p, int id) {
     ++p->available_count;
 
     if ((0)) {
-        printf("Available ids: [");
+        fprintf(stderr, "Available ids: [");
         for (int i = 0; i < p->available_count; ++i)
-        { printf("%d, ", p->nodes[i].an_available_id); }
-        printf("]\n");
+        { fprintf(stderr, "%d, ", p->nodes[i].an_available_id); }
+        fprintf(stderr, "]\n");
     }
 }
 
@@ -96,7 +96,7 @@ static int pfx(grow) (POOL *p) {
     int prev_capacity = p->capacity;
     int new_capacity = p->capacity * 2; // <- Grow factor.
 
-    printf("Capacity old %d new %d\n", p->capacity, new_capacity);
+    fprintf(stderr, "Capacity old %d new %d\n", p->capacity, new_capacity);
     pfx(Node)* new_nodes = (pfx(Node)*) realloc(p->nodes, sizeof(pfx(Node)) * (size_t)new_capacity);
 
     if (new_nodes == NULL) { return -1; }

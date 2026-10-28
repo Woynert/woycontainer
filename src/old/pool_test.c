@@ -11,11 +11,11 @@
 
 
 void print_all(float_Pool *pool) {
-    printfd("\nPRINTING ALL:");
-    printfd("capacity %d available_count %d", pool->capacity, pool->available_count);
+    logline("\nPRINTING ALL:");
+    logline("capacity %d available_count %d", pool->capacity, pool->available_count);
     for (int i = 0; i < pool->capacity; ++i) {
         if (pool->nodes[i].used) {
-            printfd("id %d value %f", i, pool->nodes[i].value);
+            logline("id %d value %f", i, pool->nodes[i].value);
         }
     }
     printf("\n");
@@ -40,7 +40,7 @@ void test1(void) {
     item = float_Pool_get(&pool, id);
     wassert(item != NULL);
     wassert(*item == og_item);
-    printfd("id %d item %f og_item %f", id, *item, og_item);
+    logline("id %d item %f og_item %f", id, *item, og_item);
     print_all(&pool);
 
     og_item = 500;
@@ -50,7 +50,7 @@ void test1(void) {
     item = float_Pool_get(&pool, id);
     wassert(item != NULL);
     wassert(*item == og_item);
-    printfd("id %d item %f og_item %f", id, *item, og_item);
+    logline("id %d item %f og_item %f", id, *item, og_item);
     print_all(&pool);
 
     og_item = 99999;
@@ -60,7 +60,7 @@ void test1(void) {
     item = float_Pool_get(&pool, id);
     wassert(item != NULL);
     wassert(*item == og_item);
-    printfd("id %d item %f og_item %f", id, *item, og_item);
+    logline("id %d item %f og_item %f", id, *item, og_item);
     print_all(&pool);
 
     // delete
@@ -79,7 +79,7 @@ void test1(void) {
     item = float_Pool_get(&pool, id);
     wassert(item != NULL);
     wassert(*item == og_item);
-    printfd("id %d item %f og_item %f", id, *item, og_item);
+    logline("id %d item %f og_item %f", id, *item, og_item);
     print_all(&pool);
 
     err = float_Pool_remove(&pool, id3);

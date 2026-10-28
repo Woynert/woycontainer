@@ -17,7 +17,7 @@ typedef struct Age {
 
 
 void map_print(name2age_map *m) {
-    printfd("\nPrinting map.");
+    logline("\nPrinting map.");
     int count = 0;
     name2age_map_It it = { 0 };
     while (name2age_map_it_next(m, &it)) {
@@ -164,7 +164,7 @@ typedef struct {
 
 bool items_are_equal(Fruit a, Fruit b) {
     bool res = wstrview_equals(wcstr(a.name), wcstr(b.name));
-    /*printfd("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
+    /*logline("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
     return res;
 }
 
@@ -176,7 +176,7 @@ typedef struct Item2Find {
 
 
 void map_fruit_print(Map *m) {
-    printfd("\nPrinting map.");
+    logline("\nPrinting map.");
     int count = 0;
     Map_Fruit_It it = { 0 };
     while (Map_Fruit_it_next(m, &it)) {
@@ -217,13 +217,13 @@ bool should_find_these(const Map *m, MAP__TYPE *p_items, const int item_amount) 
     for (int k = 0; k < item_amount; ++k) {
         Item2Find *item = &items[k];
         if (!item->found) {
-            printfd("WAR: Didn't find item %d (%s)", k, item->item.name);
+            logline("WAR: Didn't find item %d (%s)", k, item->item.name);
             return false;
         }
     }
 
     if (item_amount != valid_items_found_count) {
-        printfd("WAR: Expected to find %d items but found %d", item_amount, valid_items_found_count);
+        logline("WAR: Expected to find %d items but found %d", item_amount, valid_items_found_count);
         return false;
     }
     return true; // success;
@@ -326,7 +326,7 @@ TEST test_general(void) {
     ASSERT_INT(err, 0);
     ASSERT_INT(Map_Fruit_pair_count(m), 1);
     
-    printfd("\n---->>> Removed APPLE and Pear, should remain Banana.");
+    logline("\n---->>> Removed APPLE and Pear, should remain Banana.");
     map_fruit_print(m);
     {
         Fruit to_find[] = { makefruit("Banana") };
@@ -346,7 +346,7 @@ TEST test_general(void) {
         ASSERT(should_find_these(m, to_find, countof(to_find)));
     }
 
-    printfd("\n---->>> Reinserting APPLE.");
+    logline("\n---->>> Reinserting APPLE.");
 
     key = cstr_SL("APPLE");
     fruit = (Fruit) { "Apple" };
@@ -394,9 +394,9 @@ TEST test_general(void) {
 
         err = Map_Fruit_remove(m, it.key);
         if (err != 0) {
-            printfd(ANSI_RED"Failed to remove: "PRIstrw" = %s", PRIstrarg(it.key), it.value->name);
+            logline(ANSI_RED"Failed to remove: "PRIstrw" = %s", PRIstrarg(it.key), it.value->name);
         } else {
-            printfd(ANSI_GRE"Removed: "PRIstrw" = %s", PRIstrarg(it.key), it.value->name);
+            logline(ANSI_GRE"Removed: "PRIstrw" = %s", PRIstrarg(it.key), it.value->name);
         }
         ASSERT_INT(err, 0);
     }

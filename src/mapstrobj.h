@@ -48,7 +48,7 @@ void mapstrobj_free(MapStrObj *m) {
 /// @Note. If value didn't exist then set, else just returns existing.
 /// @Returns ANYTYPE_NULL on error.
 Anytype mapstrobj_insert_or_get(MapStrObj *m, const strview_t key, const Anytype obj) {
-    if (obj.size <= 0) { printferr("Size <= 0"); return ANYTYPE_NULL; }
+    if (obj.size <= 0) { logerror("Size <= 0"); return ANYTYPE_NULL; }
     MapStrObj__Anytype *item = MapStrObj__MapStrAnytype_get(&m->keys, key);
     if (item) {
         item->frame = m->curr_frame;
@@ -56,7 +56,7 @@ Anytype mapstrobj_insert_or_get(MapStrObj *m, const strview_t key, const Anytype
     }
     int err = MapStrObj__MapStrAnytype_upsert(&m->keys, key, (MapStrObj__Anytype){0});
     item = MapStrObj__MapStrAnytype_get(&m->keys, key);
-    if (err || !item) { printferr("OOM?"); return ANYTYPE_NULL; }
+    if (err || !item) { logerror("OOM?"); return ANYTYPE_NULL; }
     item->any = (Anytype) {
         .data = malloc((size_t)obj.size),
         .size = obj.size,
@@ -74,7 +74,7 @@ void mapstrobj_remove(MapStrObj *m, const strview_t key) {
     if (!item) { return; }
     if (item->any.data) { free(item->any.data); }
     int err = MapStrObj__MapStrAnytype_remove(&m->keys, key);
-    if (err) { printferr("W: Couldn't remove from MapStrID."); }
+    if (err) { logerror("W: Couldn't remove from MapStrID."); }
 }
 
 
@@ -95,7 +95,7 @@ void mapstrobj_free_older_than_frame(MapStrObj *m, Arena scratch) {
     for (int i = 0; i < keys_to_delete.views.count; ++i) {
         strview_t view = strpool_get_from_view(&keys_to_delete, keys_to_delete.views._items[i]);
         mapstrobj_remove(m, view);
-        printfd("D: Removing state for id ["PRIstrw"]", PRIstrarg(view));
+        logline("D: Removing state for id ["PRIstrw"]", PRIstrarg(view));
     }
 }
 
@@ -103,7 +103,7 @@ void mapstrobj_free_older_than_frame(MapStrObj *m, Arena scratch) {
     ({                                                                                                    \
         Anytype __any = mapstrobj_insert_or_get((map), (ID), Anytype_make((default), TYPE));              \
         typeof(default) *__instance = Anytype_read_as(__any, TYPE);                                       \
-        if (!__instance) { printferr("WAR: Couldn't get from framearena");  }                             \
+        if (!__instance) { logerror("WAR: Couldn't get from framearena");  }                             \
         __instance;                                                                                       \
     })
 
@@ -111,7 +111,7 @@ void mapstrobj_free_older_than_frame(MapStrObj *m, Arena scratch) {
     ({                                                                                                    \
         Anytype __any = mapstrobj_insert_or_get((map), (ID), Anytype_make((TYPE){0}, TYPE));              \
         TYPE *__instance = Anytype_read_as(__any, TYPE);                                                  \
-        if (!__instance) { printferr("WAR: Couldn't get from framearena");  }                             \
+        if (!__instance) { logerror("WAR: Couldn't get from framearena");  }                             \
         __instance;                                                                                       \
     })
 

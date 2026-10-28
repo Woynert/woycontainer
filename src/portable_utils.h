@@ -105,6 +105,29 @@ int python_modulo(int n, int M) { return ((n % M) + M) % M; }
 #define ANSI_MAG "\033[35m"
 #define ANSI_CYA "\033[36m"
 
+/*
+    Print functions:
+    printf        STDOUT
+    printfstderr  STDERR
+    printfline    STDOUT + \n
+    logline       STDERR + COLOR + LINE_INFO + \n
+    logerror      STDERR + COLOR + LINE_INFO + \n
+    logwar        STDERR + COLOR + LINE_INFO + \n
+*/
+
+#define printfstderr(...) fprintf(stderr, __VA_ARGS__)
+#define printfline(...) do { printf(__VA_ARGS__); printf("\n"); } while(0)
+
+#define logline(fmt, ...) \
+    do { printfstderr(ANSI_YEL fmt, ##__VA_ARGS__); \
+         printfstderr(ANSI_RESET" %s:%s:%d\n", __func__, __FILE__, __LINE__); } while(0)
+#define logerror(fmt, ...) logline(ANSI_RED"Err: "fmt, ##__VA_ARGS__)
+#define logwar(fmt, ...) logline(ANSI_RED"War: "fmt, ##__VA_ARGS__)
+
+#define printvalnum(var) do { printf( #var " = %d\n", var); } while(0)
+#define printval(fmt, ...) do { printf(#__VA_ARGS__" "fmt"\n", ##__VA_ARGS__); } while(0)
+
+
 #ifdef DEBUG
     #define DEBUG_ASSERT wassert
 #else
@@ -114,10 +137,10 @@ int python_modulo(int n, int M) { return ((n % M) + M) % M; }
 #define wassert(value) \
     do { \
         if ((!!(value)) != true) { \
-            printf("\nFAILED ASSERT %s|%s:%d\n", \
+            printfstderr("\nFAILED ASSERT %s|%s:%d\n", \
                     __func__, __FILE__, __LINE__); \
-            printf(ANSI_RED#value); \
-            printf(ANSI_RESET"\n"); \
+            printfstderr(ANSI_RED#value); \
+            printfstderr(ANSI_RESET"\n"); \
             __asm__("int3"); \
             exit(1); \
         } \
@@ -126,11 +149,11 @@ int python_modulo(int n, int M) { return ((n % M) + M) % M; }
 #define wassert_msg(value, msg) \
     do { \
         if ((!!(value)) != true) { \
-            printf("\nFAILED ASSERT %s|%s:%d\n", \
+            printfstderr("\nFAILED ASSERT %s|%s:%d\n", \
                     __func__, __FILE__, __LINE__); \
-            printf(msg"\n"); \
-            printf(ANSI_RED#value); \
-            printf(ANSI_RESET"\n"); \
+            printfstderr(msg"\n"); \
+            printfstderr(ANSI_RED#value); \
+            printfstderr(ANSI_RESET"\n"); \
             __asm__("int3"); \
             exit(1); \
         } \
@@ -142,17 +165,6 @@ int python_modulo(int n, int M) { return ((n % M) + M) % M; }
 
 #define wassert_live wassert
 
-#define printfd(fmt, ...) \
-    do { \
-        printf(ANSI_YEL fmt, ##__VA_ARGS__); \
-        printf(ANSI_RESET" %s:%s:%d\n", __func__, __FILE__, __LINE__); \
-    } while (0)
-
-#define printferr(fmt, ...) printfd(ANSI_RED"Err: "fmt, ##__VA_ARGS__)
-
-
-#define printval(fmt, ...) do { printf(#__VA_ARGS__" "fmt"\n", ##__VA_ARGS__); } while(0)
-#define printvalnum(var) do { printf( #var " = %d\n", var); } while(0)
 
 #define Bool_Fmt "%s"
 #define Bool_Arg(x) ((x) ? "true" : "false")
@@ -265,8 +277,8 @@ inline bool  zid_valid(zid_t id) { return id.id > 0; }
 
 
 void print_hex(const void *data, size_t len) {
-    for (size_t i = 0; i < len; i++) { printf("%02X ", ((unsigned char*)data)[i]); }
-    printf("\n");
+    for (size_t i = 0; i < len; i++) { printfstderr("%02X ", ((unsigned char*)data)[i]); }
+    printfstderr("\n");
 }
 
 // https://stackoverflow.com/a/72983424

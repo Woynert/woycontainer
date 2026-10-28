@@ -23,7 +23,7 @@ typedef struct Item2Find {
 
 bool items_are_equal(Fruit a, Fruit b) {
     bool res = wstrview_equals(wcstr(a.name), wcstr(b.name));
-    /*printfd("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
+    /*logline("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
     return res;
 }
 
@@ -54,12 +54,12 @@ bool should_find_these(const List_Fruit *l, Fruit *p_items, const int item_amoun
     for (int k = 0; k < item_amount; ++k) {
         Item2Find *item = &items[k];
         if (!item->found) {
-            printfd("WAR: Didn't find item %d (%s)", k, item->item.name);
+            logline("WAR: Didn't find item %d (%s)", k, item->item.name);
             return false;
         }
     }
     if (item_amount != valid_items_found_count) {
-        printfd("WAR: Expected to find %d items but found %d", item_amount, valid_items_found_count);
+        logline("WAR: Expected to find %d items but found %d", item_amount, valid_items_found_count);
         return false;
     }
     return true; // success;
@@ -100,7 +100,7 @@ TEST test_general(void) {
 
     int count = 0;
     for (List_Fruit__Node *node = l->head; node != NULL; node = node->next) {
-        /*printfd("List has item [%s]", node->item.name);*/
+        /*logline("List has item [%s]", node->item.name);*/
         ++count;
     }
     ASSERT_INT(count, 3 + (1 << 10));
@@ -108,7 +108,7 @@ TEST test_general(void) {
     count = 0;
     List_Fruit_It it = { 0 };
     while(List_Fruit_it_next(l, &it)) {
-        printfd(ANSI_BLU"List has item [%s]", it.item->name);
+        logline(ANSI_BLU"List has item [%s]", it.item->name);
         ++count;
     }
     ASSERT_INT(count, 3 + (1 << 10));

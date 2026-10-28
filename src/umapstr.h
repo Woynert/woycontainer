@@ -123,7 +123,7 @@ int pub(upsert)(Strumap *m, strview_t key_str, UMAPSTR__TYPE value) {
         }
     }
     // Else insert.
-    if (err) { printferr("Couldn't rehash."); }
+    if (err) { logerror("Couldn't rehash."); }
     ID key = strpool_append(&m->strpool, key_str);
     if (!ID_valid(key)) { return -1; }
     err = pri(Umap__set_pair_with_final_key)(&m->umap, bucket, key, value);
@@ -152,7 +152,7 @@ int pub(remove)(Strumap *m, strview_t key_str) {
         if (wstrview_equals(saved_key, key_str)) {
             // Found it.
             int err = pri(Umap__Vec_Pair_remove_at)(&bucket->pairs, i);
-            if (err != 0) { printfd("ERROR(%d) Vec_Pair. Couldn't delete.", err); }
+            if (err != 0) { logline("ERROR(%d) Vec_Pair. Couldn't delete.", err); }
             --m->umap.pair_count;
             return 0;
         }

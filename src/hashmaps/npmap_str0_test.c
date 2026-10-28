@@ -22,18 +22,18 @@ strpool__str cstr(const char* c_str) {
 
 
 void print_pairs(const Map *m) {
-    printfd("\nMap pairs %d, max capacity %d", m->size, (1 << SIZE_EXP) -1);
-    printfd("Printing pairs:");
+    logline("\nMap pairs %d, max capacity %d", m->size, (1 << SIZE_EXP) -1);
+    logline("Printing pairs:");
     for (int i = 0; i < (1 << SIZE_EXP); ++i) {
         Node * const * node = &m->nodes[i];
         if (*node == NULL) { continue; }
-        printfd("%d = %s", (*node)->key, (*node)->value.name);
+        logline("%d = %s", (*node)->key, (*node)->value.name);
     }
 }
 
 bool items_are_equal(Fruit a, Fruit b) {
     bool res = str_equals(cstr(a.name), cstr(b.name));
-    /*printfd("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
+    /*logline("COMPARING %s with %s (%s)", a.name, b.name, PRIbool(res));*/
     return res;
 }
 
@@ -73,13 +73,13 @@ bool should_find_these(const Map *m, MAP__TYPE *p_items, const int item_amount) 
     for (int k = 0; k < item_amount; ++k) {
         Item2Find *item = &items[k];
         if (!item->found) {
-            printfd("WAR: Didn't find item %d", k);
+            logline("WAR: Didn't find item %d", k);
             return false;
         }
     }
 
     if (item_amount != valid_items_found_count) {
-        printfd("WAR: Expected to find %d items but found %d", item_amount, valid_items_found_count);
+        logline("WAR: Expected to find %d items but found %d", item_amount, valid_items_found_count);
         return false;
     }
     return true; // success;
@@ -177,7 +177,7 @@ TEST test_general(void) {
     ASSERT_INT(err, 0);
     ASSERT_INT(m->size, (1 << SIZE_EXP) -3);
 
-    printfd("\n---->>> Removed APPLE and Pear, should remain Banana.");
+    logline("\n---->>> Removed APPLE and Pear, should remain Banana.");
     print_pairs(m);
     {
         Fruit to_find[] = { quickfruit("Banana") };

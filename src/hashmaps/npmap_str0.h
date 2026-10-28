@@ -90,7 +90,7 @@ Node **lookup(Map *m, strpool__str key, int *out_idx) {
             // Get string from strpol
             strpool__str stored_key = strpool_get(&m->strpool, node->key);
             if (stored_key.data == NULL) {
-                printfd("error: Should never happen.");
+                logline("error: Should never happen.");
             }
             if (str_equals(key, stored_key)) { // Found it.
                 if (out_idx != NULL) { *out_idx = i; }
@@ -131,7 +131,7 @@ int upsert(Map *m, strpool__str key, MAP__TYPE value) {
         new_node = *node_slot;
     }
 
-    printfd("Set it here mate! SUCESSS item_id (%d)", (int)((ptrdiff_t)(new_node - m->items)));
+    logline("Set it here mate! SUCESSS item_id (%d)", (int)((ptrdiff_t)(new_node - m->items)));
     new_node->value = value;
     return 0;
 }

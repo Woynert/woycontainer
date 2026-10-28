@@ -185,7 +185,7 @@ void pri(rehash_if_needed)(Strmap *old_m) {
 
     int err = pub(create_with_allocator)(new_m, old_m->allocator, old_m->allocator_userdata);
     if (err == -1) {
-        printfd("ERR: Couldn't rehash, no memory?");
+        logline("ERR: Couldn't rehash, no memory?");
         return;
     }
 
@@ -230,7 +230,7 @@ void pri(rehash_if_needed)(Strmap *old_m) {
 
     if ((0)) {
         exit_abort:
-        printfd("ERR: Couldn't rehash, no memory?");
+        logline("ERR: Couldn't rehash, no memory?");
         pub(free)(new_m);
     }
 
@@ -263,7 +263,7 @@ int pub(set_pair)(Strmap *m, strmap__view key, STRMAP__TYPE value) {
 
     int strpool_key_id = strpool_append(&m->strpool, strmap__view_to_strpool_str(key));
     if (strpool_key_id < 0) {
-        printfd("A");
+        logline("A");
         return -1;
     }
 
@@ -272,7 +272,7 @@ int pub(set_pair)(Strmap *m, strmap__view key, STRMAP__TYPE value) {
     int err = pri(set_pair_with_final_key)(m, bucket, strpool_key_id, value);
     if (err != 0) {
         strpool_remove(&m->strpool, strpool_key_id);
-        printfd("B");
+        logline("B");
         return -1;
     }
 
@@ -313,7 +313,7 @@ static int pub(remove)(Strmap *m, strmap__view key) {
             err += pri(key_da_pop_at_preserve_order)(&bucket->keys, i, NULL);
             err += pri(value_da_pop_at_preserve_order)(&bucket->values, i, NULL);
             if (err != 0) {
-                printfd("ERROR %d. Couldn't fully delete.", err);
+                logline("ERROR %d. Couldn't fully delete.", err);
             }
             return 0;
         }

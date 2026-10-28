@@ -114,7 +114,7 @@ static inline Strumap__umap__Bucket *strumap__hash_and_get_bucket(Strumap *m, st
         //if (wstrview_equals(saved_key, key_str)) {
             //// Found it.
             //int err = Strumap__umap__Vec_Pair_remove_at(&bucket->pairs, i);
-            //if (err != 0) { printfd("ERROR(%d) Vec_Pair. Couldn't delete.", err); }
+            //if (err != 0) { logline("ERROR(%d) Vec_Pair. Couldn't delete.", err); }
             //--m->umap.pair_count;
             //return 0;
         //}

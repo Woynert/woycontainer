@@ -273,9 +273,9 @@ void pri(swap_nodes_diff_bucket)(WMapIndex *m, ID a, ID b) {
         ID a_prev = ID_equals(a_bu_prev_init, b) ? a : a_bu_prev_init;
         ID b_prev = ID_equals(b_bu_prev_init, a) ? b : b_bu_prev_init;
         if (ID_valid(a_prev)) { m->bucket_next.items[ID_get(a_prev)] = b; }
-        else { printferr("wtf: Trying to swap root."); }
+        else { logerror("wtf: Trying to swap root."); }
         if (ID_valid(b_prev)) { m->bucket_next.items[ID_get(b_prev)] = a; }
-        else { printferr("wtf: Trying to swap root."); }
+        else { logerror("wtf: Trying to swap root."); }
         // If invalid this node must be root.
         // Note: Can't touch the root, shouldn't be swapping in the first place.
     }

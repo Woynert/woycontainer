@@ -127,20 +127,20 @@ int pri(rehash_if_needed)(Wmapstr *old_m) {
     Wmapstr *new_m = &__new_map;
     pub(create_with_allocator)(new_m, old_table->keys.allocator, old_table->keys.allocator_userdata);
     int err = pri(Table_grow)(&new_m->table, new_bucket_count);
-    if (err) { pub(free)(new_m); printferr("OOM?"); return -1; }
+    if (err) { pub(free)(new_m); logerror("OOM?"); return -1; }
     new_m->table.bucket_count = new_m->table.capacity;
 
     // Rehash keys.
     pub(It) it = pub(make_it)(old_m);
     while (pub(it_next)(old_m, &it)) {
-        //printfd("shall not pass: key ["PRIstrw"]", PRIstrarg(it.key));
+        //logline("shall not pass: key ["PRIstrw"]", PRIstrarg(it.key));
         // @Note: Keep this procedure in sync with 'upsert' function.
         ID i_prev = ID_INVALID, i = ID_INVALID;
         bool found = 0 == pri(find)(new_m, it.key, &i, &i_prev);
-        if (found) { printferr("wtf: Key already exists."); goto quit_abort; }
+        if (found) { logerror("wtf: Key already exists."); goto quit_abort; }
         if (ID_get(i) >= new_m->table.capacity) {
             err = pri(Table_grow)(&new_m->table, new_m->table.capacity * 2);
-            if (err) { printferr("OOM?"); goto quit_abort; }
+            if (err) { logerror("OOM?"); goto quit_abort; }
         }
         pri(Table_set_new_pair)(&new_m->table, i_prev, i, it.__key_id, it.__value_id);
     }
@@ -206,15 +206,15 @@ int pub(upsert)(Wmapstr *m, strview_t key, TYPE item) {
         if (err) { return -1; }
     }
     ID value_id = ID_make(pri(Slot_Value_append)(&m->values, item));
-    if (!ID_valid(value_id)) { printferr("OOM?."); return -1; }
+    if (!ID_valid(value_id)) { logerror("OOM?."); return -1; }
     ID key_id = strpool_append(&m->strpool, key);
     if (!ID_valid(key_id)) {
         pri(Slot_Value_pop)(&m->values, ID_get(value_id));
-        printferr("OOM?");
+        logerror("OOM?");
         return -1;
     }
     pri(Table_set_new_pair)(&m->table, i_prev, i, key_id, value_id);
-    if (pri(rehash_if_needed)(m)) { printfd("W: Rehashing failed."); }
+    if (pri(rehash_if_needed)(m)) { logline("W: Rehashing failed."); }
     return 0;
 }
 
@@ -230,9 +230,9 @@ void pub(remove)(Wmapstr *m, strview_t key_str) {
     bool found = 0 == pri(find)(m, key_str, &node, NULL);
     if (!found) { return; }
     int err = pri(Slot_Value_pop)(&m->values, ID_get(m->table.val_ids.items[ID_get(node)]));
-    if (err) { printferr("Couldn't remove value."); }
+    if (err) { logerror("Couldn't remove value."); }
     err = strpool_remove(&m->strpool, m->table.keys.items[ID_get(node)]);
-    if (err) { printferr("Couldn't remove key from strpool."); }
+    if (err) { logerror("Couldn't remove key from strpool."); }
     pri(Table_remove)(&m->table, node);
 }
 

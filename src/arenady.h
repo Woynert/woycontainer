@@ -41,7 +41,7 @@ static inline i64 arenady__pow2roundup (i64 x) {
 int arenady__grow(ArenaDy *a, i64 minimum) {
     i64 new_cap = arenady__pow2roundup((a->end - a->root) + minimum);
     char *newbuf = (char *)realloc(a->root, (size_t)new_cap);
-    if (newbuf == NULL) { printfd("OUT OF MEMORY."); return -1; }
+    if (newbuf == NULL) { logline("OUT OF MEMORY."); return -1; }
     a->beg = newbuf + (a->beg - a->root);
     a->end = newbuf + new_cap;
     a->root = newbuf;
@@ -69,7 +69,7 @@ void *arenady_alloc(ArenaDy *a, i64 size, i64 align, i64 count)
     if (available <= 0 || count > available / size) {
         int err = arenady__grow(a, size * count + padding);
         if (err != 0) {
-            printfd("OUT OF MEMORY.");
+            logline("OUT OF MEMORY.");
             wassert(false); // OOM.
         }
     }

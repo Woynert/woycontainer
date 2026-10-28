@@ -216,7 +216,7 @@ int pri(rehash_if_needed)(UMap *old_m) {
 
     int err = pri(init)(new_m, old_m->allocator, old_m->allocator_userdata);
     if (err == -1) {
-        printfd("ERR: Couldn't rehash, no memory?");
+        logline("ERR: Couldn't rehash, no memory?");
         return -1;
     }
     new_m->userdata = old_m->userdata;
@@ -252,12 +252,12 @@ int pri(rehash_if_needed)(UMap *old_m) {
 
     if ((0)) {
         exit_abort:
-        printfd("ERR: Couldn't rehash, no memory?");
+        logline("ERR: Couldn't rehash, no memory?");
         pub(free)(new_m);
         return -1;
     }
 
-    printfd("DEBUG: Rehashed.");
+    logline("DEBUG: Rehashed.");
     return 0;
 }
 
@@ -296,7 +296,7 @@ static int pub(remove)(UMap *m, KEY key) {
         if (UMAP__KEY_EQUAL(bucket->pairs.items[i].key, key, m->userdata)) {
             // Found it.
             int err = pri(Vec_Pair_remove_at)(&bucket->pairs, i);
-            if (err != 0) { printfd("ERROR(%d) Vec_Pair. Couldn't delete.", err); }
+            if (err != 0) { logline("ERROR(%d) Vec_Pair. Couldn't delete.", err); }
             --m->pair_count;
             return 0;
         }
